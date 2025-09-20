@@ -1,14 +1,14 @@
 <template>
   <div class="p-6 space-y-4">
-    <h1 class="text-2xl font-bold">Polyrhythm Generator</h1>
+    <h1 class="text-2xl font-bold">peepeepoopoo machine</h1>
     <div class="space-y-2">
       <label class="block">Tempo (BPM):</label>
       <input v-model.number="tempo" type="number" class="border p-2 rounded w-32" />
 
-      <label class="block">Host Time Signature (ex: 4/4):</label>
+      <label class="block">Host:</label>
       <input v-model="hostTimeSig" type="text" class="border p-2 rounded w-32" />
 
-      <label class="block">Guest Cycle Length (ex: 33/16):</label>
+      <label class="block">Guest:</label>
       <input v-model="guestCycle" type="text" class="border p-2 rounded w-32" />
 
       <label class="block">Phrase Length (bars):</label>
@@ -51,11 +51,14 @@
         Download MIDI
       </button>
       <button
-        v-if="midiEvents.length"
-        @click="playMIDI"
+        v-if="midiEvents.length && !isPlaying"
+        @click="playPreview"
         class="px-4 py-2 bg-green-600 text-white rounded"
       >
         Play
+      </button>
+      <button v-if="isPlaying" @click="stopPreview" class="px-4 py-2 bg-red-600 text-white rounded">
+        Stop
       </button>
     </div>
   </div>
@@ -78,6 +81,10 @@ const truncation = ref<number>(0)
 const fullCycles = ref<number>(0)
 const midiUrl = ref<string | null>(null)
 const midiEvents = ref<{ pitch: number; duration: number }[]>([])
+const isPlaying = ref(false)
+let synth: Tone.Synth | null = null
+let clickSynth: Tone.MembraneSynth | null = null
+let clickLoop: Tone.Loop | null = null
 
 function generateGroupings() {
   const [num, denom] = guestCycle.value.split('/').map(Number)
@@ -133,9 +140,10 @@ function computeTruncation() {
   truncation.value = phrase16ths - used
 }
 
-function selectGrouping(g: number[]) {
+async function selectGrouping(g: number[]) {
   selectedGrouping.value = g
-  generateMIDI() // automatically generate MIDI in memory
+  generateMIDI()
+  await playPreview()
 }
 
 function generateMIDI() {
@@ -204,15 +212,46 @@ function downloadMIDI() {
   a.click()
 }
 
-async function playMIDI() {
+async function playPreview() {
   if (!midiEvents.value.length) return
   await Tone.start()
-  const synth = new Tone.Synth().toDestination()
+  stopPreview()
+  isPlaying.value = true
+
+  synth = new Tone.Synth().toDestination()
+  clickSynth = new Tone.MembraneSynth().toDestination()
+
+  const [hostNum, hostDen] = hostTimeSig.value.split('/').map(Number)
+  const beatDuration = 60 / tempo.value
+
+  // Schedule 4/4 metronome clicks
+  clickLoop = new Tone.Loop((time) => {
+    if (clickSynth) clickSynth.triggerAttackRelease('C3', '8n', time)
+  }, beatDuration).start(0)
+
   let now = Tone.now()
   for (let e of midiEvents.value) {
-    const durSeconds = e.duration * (60 / tempo.value / 4) // 16th-note duration in seconds
-    synth.triggerAttackRelease(Tone.Frequency(e.pitch, 'midi'), durSeconds, now)
+    const durSeconds = e.duration * (60 / tempo.value / 4)
+    if (synth) synth.triggerAttackRelease(Tone.Frequency(e.pitch, 'midi'), durSeconds, now)
     now += durSeconds
   }
+  Tone.Transport.start()
+}
+
+function stopPreview() {
+  isPlaying.value = false
+  if (synth) {
+    synth.dispose()
+    synth = null
+  }
+  if (clickSynth) {
+    clickSynth.dispose()
+    clickSynth = null
+  }
+  if (clickLoop) {
+    clickLoop.dispose()
+    clickLoop = null
+  }
+  Tone.Transport.stop()
 }
 </script>
