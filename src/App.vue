@@ -1,25 +1,38 @@
 <template>
   <div class="p-6 space-y-4">
-    <h1 class="text-2xl font-bold">peepeepoopoo machine</h1>
-    <div class="space-y-2">
-      <label class="block">Tempo (BPM):</label>
-      <input v-model.number="tempo" type="number" class="border p-2 rounded w-32" />
-
-      <label class="block">Host:</label>
-      <input v-model="hostTimeSig" type="text" class="border p-2 rounded w-32" />
-
-      <label class="block">Guest:</label>
-      <input v-model="guestCycle" type="text" class="border p-2 rounded w-32" />
-
-      <label class="block">Phrase Length (bars):</label>
-      <input v-model.number="phraseBars" type="number" class="border p-2 rounded w-32" />
-
-      <label class="block">Pitch (MIDI note, F#=42):</label>
-      <input v-model.number="pitch" type="number" class="border p-2 rounded w-32" />
+    <h1 class="text-2xl font-bold">33</h1>
+    <div class="flex flex-col gap-2">
+      <label class="input rounded">
+        <span class="label">Tempo</span>
+        <input v-model.number="tempo" type="number" placeholder="120" />
+      </label>
+      <label class="input rounded">
+        <span class="label">Host</span>
+        <input v-model="hostTimeSig" type="text" placeholder="4/4" />
+      </label>
+      <label class="input rounded">
+        <span class="label">Guest</span>
+        <input v-model="guestCycle" type="text" placeholder="33/16" />
+      </label>
+      <label class="input rounded">
+        <span class="label">Bars</span>
+        <input v-model.number="phraseBars" type="number" placeholder="8" />
+      </label>
+      <label class="input rounded">
+        <span class="label">Pitch</span>
+        <input v-model.number="pitch" type="number" placeholder="41" />
+      </label>
+      <label class="input rounded">
+        <span class="label">Max Repeat</span>
+        <input v-model.number="maxRepeat" type="number" placeholder="3" />
+      </label>
     </div>
 
     <div>
-      <button @click="generateGroupings" class="px-4 py-2 bg-blue-500 text-white rounded">
+      <button
+        @click="generateGroupings"
+        class="btn btn-primary px-4 py-2 text-primary-content rounded"
+      >
         Generate Groupings
       </button>
     </div>
@@ -31,8 +44,11 @@
           v-for="(g, i) in groupings"
           :key="i"
           @click="selectGrouping(g)"
-          class="px-3 py-1 rounded border"
-          :class="{ 'bg-green-300': selectedGrouping === g }"
+          class="btn px-3 py-1 rounded border"
+          :class="{
+            'btn-success text-success-content': selectedGrouping === g && !isPlaying,
+            'btn-error': selectedGrouping === g && isPlaying,
+          }"
         >
           {{ g.join('-') }}
         </button>
@@ -46,18 +62,23 @@
       <button
         v-if="midiUrl"
         @click="downloadMIDI"
-        class="px-4 py-2 bg-purple-600 text-white rounded"
+        class="btn px-4 py-2 bg-purple-600 text-white rounded"
       >
         Download MIDI
       </button>
       <button
         v-if="midiEvents.length && !isPlaying"
-        @click="playPreview"
-        class="px-4 py-2 bg-green-600 text-white rounded"
+        @click="isPlaying ? stopPreview() : playPreview()"
+        class="btn px-4 py-2 bg-green-600 text-white rounded"
+        :class="{ 'bg-warning text-success-content': isPlaying }"
       >
         Play
       </button>
-      <button v-if="isPlaying" @click="stopPreview" class="px-4 py-2 bg-red-600 text-white rounded">
+      <button
+        v-if="isPlaying"
+        @click="stopPreview"
+        class="btn px-4 py-2 bg-red-600 text-white rounded"
+      >
         Stop
       </button>
     </div>
@@ -74,6 +95,7 @@ const hostTimeSig = ref('4/4')
 const guestCycle = ref('33/16')
 const phraseBars = ref(8)
 const pitch = ref(42)
+const maxRepeat = ref(1)
 
 const groupings = ref<number[][]>([])
 const selectedGrouping = ref<number[] | null>(null)
@@ -82,8 +104,8 @@ const fullCycles = ref<number>(0)
 const midiUrl = ref<string | null>(null)
 const midiEvents = ref<{ pitch: number; duration: number }[]>([])
 const isPlaying = ref(false)
-let synth: Tone.Synth | null = null
-let clickSynth: Tone.MembraneSynth | null = null
+let synth: Tone.PolySynth | null = null
+let clickSynth: Tone.MetalSynth | null = null
 let clickLoop: Tone.Loop | null = null
 
 function generateGroupings() {
@@ -93,13 +115,13 @@ function generateGroupings() {
     return
   }
   const rawGroupings: number[][] = []
-  generatePartitions(num, [3, 5, 7, 9], [], rawGroupings)
+  generatePartitions(num, [2, 3, 5, 7, 9], [], rawGroupings)
 
   groupings.value = rawGroupings.filter((g) => {
     const unique = new Set(g)
     if (unique.size <= 1) return false
     if (!(unique.has(5) || unique.has(7))) return false
-    if (hasTooManyConsecutive(g, 3, 5)) return false
+    if (hasTooManyConsecutive(g, 2, maxRepeat.value)) return false
     return true
   })
 }
@@ -143,7 +165,11 @@ function computeTruncation() {
 async function selectGrouping(g: number[]) {
   selectedGrouping.value = g
   generateMIDI()
-  await playPreview()
+  if (isPlaying.value) {
+    stopPreview()
+  } else {
+    await playPreview()
+  }
 }
 
 function generateMIDI() {
@@ -208,7 +234,7 @@ function downloadMIDI() {
   if (!midiUrl.value) return
   const a = document.createElement('a')
   a.href = midiUrl.value
-  a.download = 'polyrhythm.mid'
+  a.download = `${selectedGrouping.value}.mid`
   a.click()
 }
 
@@ -218,15 +244,15 @@ async function playPreview() {
   stopPreview()
   isPlaying.value = true
 
-  synth = new Tone.Synth().toDestination()
-  clickSynth = new Tone.MembraneSynth().toDestination()
+  synth = new Tone.PolySynth().toDestination()
+  clickSynth = new Tone.MetalSynth().toDestination()
 
   const [hostNum, hostDen] = hostTimeSig.value.split('/').map(Number)
   const beatDuration = 60 / tempo.value
 
   // Schedule 4/4 metronome clicks
   clickLoop = new Tone.Loop((time) => {
-    if (clickSynth) clickSynth.triggerAttackRelease('C3', '8n', time)
+    if (clickSynth) clickSynth.triggerAttackRelease('C-2', '8n', time, 0.25)
   }, beatDuration).start(0)
 
   let now = Tone.now()
