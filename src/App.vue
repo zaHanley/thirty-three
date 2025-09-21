@@ -1,37 +1,41 @@
 <template>
-  <div class="p-6 space-y-4">
-    <h1 class="text-2xl font-bold">33</h1>
-    <div class="flex flex-col gap-2">
-      <label class="input rounded">
-        <span class="label">Tempo</span>
-        <input v-model.number="tempo" type="number" placeholder="120" />
-      </label>
-      <label class="input rounded">
-        <span class="label">Host</span>
-        <input v-model="hostTimeSig" type="text" placeholder="4/4" />
-      </label>
-      <label class="input rounded">
-        <span class="label">Guest</span>
-        <input v-model="guestCycle" type="text" placeholder="33/16" />
-      </label>
-      <label class="input rounded">
-        <span class="label">Bars</span>
-        <input v-model.number="phraseBars" type="number" placeholder="8" />
-      </label>
-      <label class="input rounded">
-        <span class="label">Pitch</span>
-        <input v-model.number="pitch" type="number" placeholder="41" />
-      </label>
-      <label class="input rounded">
-        <span class="label">Max Repeat</span>
-        <input v-model.number="maxRepeat" type="number" placeholder="3" />
-      </label>
+  <div class="p-6 space-y-4 max-w-3xl mx-auto mt-10">
+    <h1 class="text-4xl font-bold">33</h1>
+    <div class="flex flex-row gap-1 w-full">
+      <div class="flex flex-col gap-1">
+        <label class="input rounded">
+          <span class="text-secondary">Tempo</span>
+          <input v-model.number="tempo" type="number" placeholder="120" />
+        </label>
+        <label class="input rounded">
+          <span class="text-secondary">Host</span>
+          <input v-model="hostTimeSig" type="text" placeholder="4/4" />
+        </label>
+        <label class="input rounded">
+          <span class="text-secondary">Guest</span>
+          <input v-model="guestCycle" type="text" placeholder="19/16" />
+        </label>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="input rounded">
+          <span class="text-secondary">Bars</span>
+          <input v-model.number="phraseBars" type="number" placeholder="8" />
+        </label>
+        <label class="input rounded">
+          <span class="text-secondary">Pitch</span>
+          <input v-model.number="pitch" type="number" placeholder="41" />
+        </label>
+        <label class="input rounded">
+          <span class="text-secondary">Max Repeat</span>
+          <input v-model.number="maxRepeat" type="number" placeholder="3" />
+        </label>
+      </div>
     </div>
 
     <div>
       <button
         @click="generateGroupings"
-        class="btn btn-primary px-4 py-2 text-primary-content rounded"
+        class="btn btn-sm btn-primary text-primary-content rounded"
       >
         Generate Groupings
       </button>
@@ -39,12 +43,12 @@
 
     <div v-if="groupings.length">
       <h2 class="font-semibold">Select a grouping:</h2>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-2 rounded bord">
         <button
           v-for="(g, i) in groupings"
           :key="i"
           @click="selectGrouping(g)"
-          class="btn px-3 py-1 rounded border"
+          class="btn btn-xs px-3 py-1 rounded border"
           :class="{
             'btn-success text-success-content': selectedGrouping === g && !isPlaying,
             'btn-error': selectedGrouping === g && isPlaying,
@@ -92,7 +96,7 @@ import * as Tone from 'tone'
 
 const tempo = ref(120)
 const hostTimeSig = ref('4/4')
-const guestCycle = ref('33/16')
+const guestCycle = ref('19/16')
 const phraseBars = ref(8)
 const pitch = ref(42)
 const maxRepeat = ref(1)
