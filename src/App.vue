@@ -43,9 +43,35 @@
 
     <div v-if="groupings.length">
       <h2 class="font-semibold">Select a grouping:</h2>
+
+      <!-- Group visibility controls -->
+      <div class="mb-4 p-3 bg-base-200 rounded">
+        <h3 class="text-sm font-medium mb-2">Show/Hide Groups:</h3>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="firstValue in [2, 3, 5, 7, 9]"
+            :key="firstValue"
+            @click="toggleGroupVisibility(firstValue)"
+            class="btn btn-xs rounded"
+            :class="{
+              'btn-primary': visibleGroups.has(firstValue),
+              'btn-outline': !visibleGroups.has(firstValue),
+            }"
+          >
+            {{ firstValue }} ({{ groupCounts[firstValue] }})
+          </button>
+        </div>
+      </div>
+
+      <details class="collapse bg-base-100 border-base-300 border">
+        <summary class="collapse-title font-semibold">How do I create an account?</summary>
+        <div class="collapse-content text-sm">
+          Click the "Sign Up" button in the top right corner and follow the registration process.
+        </div>
+      </details>
       <div class="flex flex-wrap gap-2 rounded bord">
         <button
-          v-for="(g, i) in groupings"
+          v-for="(g, i) in filteredGroupings"
           :key="i"
           @click="selectGrouping(g)"
           class="btn btn-xs px-3 py-1 rounded border"
@@ -90,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import * as MidiWriter from 'midi-writer-js'
 import * as Tone from 'tone'
 
@@ -101,17 +127,64 @@ const phraseBars = ref(8)
 const pitch = ref(42)
 const maxRepeat = ref(1)
 
-const groupings = ref<number[][]>([])
-const selectedGrouping = ref<number[] | null>(null)
-const truncation = ref<number>(0)
-const fullCycles = ref<number>(0)
-const midiUrl = ref<string | null>(null)
-const midiEvents = ref<{ pitch: number; duration: number }[]>([])
+const groupings = ref([] as number[][])
+const groupedGroupings = ref({} as Record<number, number[][]>)
+const visibleGroups = ref(new Set([2, 3, 5, 7, 9]) as Set<number>)
+const filteredGroupings = ref([] as number[][])
+const selectedGrouping = ref(null as number[] | null)
+const truncation = ref(0)
+const fullCycles = ref(0)
+const midiUrl = ref(null as string | null)
+const midiEvents = ref([] as { pitch: number; duration: number }[])
 const isPlaying = ref(false)
 let synth: Tone.PolySynth | null = null
 let clickSynth: Tone.MetalSynth | null = null
 let clickLoop: Tone.Loop | null = null
 
+const groupCounts = computed(() => {
+  const counts: Record<number, number> = {}
+  for (const firstValue of [2, 3, 5, 7, 9]) {
+    counts[firstValue] = groupedGroupings.value[firstValue]?.length || 0
+  }
+  return counts
+})
+
+function sortGroupings() {
+  groupings.value = groupings.value.sort((a, b) => {
+    // Sort by first value: 2, 3, 5, 7, 9
+    return a[0] - b[0]
+  })
+
+  // Group by first value
+  groupedGroupings.value = groupings.value.reduce(
+    (acc, grouping) => {
+      const firstValue = grouping[0]
+      if (!acc[firstValue]) {
+        acc[firstValue] = []
+      }
+      acc[firstValue].push(grouping)
+      return acc
+    },
+    {} as Record<number, number[][]>,
+  )
+
+  updateFilteredGroupings()
+}
+
+function updateFilteredGroupings() {
+  filteredGroupings.value = groupings.value.filter((grouping) =>
+    visibleGroups.value.has(grouping[0]),
+  )
+}
+
+function toggleGroupVisibility(firstValue: number) {
+  if (visibleGroups.value.has(firstValue)) {
+    visibleGroups.value.delete(firstValue)
+  } else {
+    visibleGroups.value.add(firstValue)
+  }
+  updateFilteredGroupings()
+}
 function generateGroupings() {
   const [num, denom] = guestCycle.value.split('/').map(Number)
   if (denom !== 16) {
@@ -128,6 +201,8 @@ function generateGroupings() {
     if (hasTooManyConsecutive(g, 2, maxRepeat.value)) return false
     return true
   })
+
+  sortGroupings()
 }
 
 function hasTooManyConsecutive(arr: number[], value: number, maxRun: number) {
