@@ -105,6 +105,14 @@
               <span v-else>Generate</span>
             </button>
 
+            <button
+              v-if="groupings.length > 0"
+              @click="selectRandomGrouping"
+              class="btn btn-sm btn-secondary rounded"
+            >
+              Random
+            </button>
+
             <!-- Action buttons that appear when grouping is selected -->
             <div v-if="selectedGrouping" class="flex gap-2">
               <button
@@ -295,6 +303,19 @@ function togglePartition(partitionValue: number) {
   } else {
     enabledPartitions.value.add(partitionValue)
   }
+}
+
+function selectRandomGrouping() {
+  if (groupings.value.length === 0) return
+  
+  // Stop any current playback first
+  if (isPlaying.value) {
+    stopPreview()
+  }
+  
+  const randomIndex = Math.floor(Math.random() * groupings.value.length)
+  const randomGrouping = groupings.value[randomIndex]
+  selectGrouping(randomGrouping)
 }
 function generateGroupings() {
   isGenerating.value = true
