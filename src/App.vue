@@ -1,5 +1,24 @@
 <template>
   <div class="min-h-screen overflow-y-scroll">
+    <!-- Audio Unlock Modal for Mobile -->
+    <div
+      v-if="showAudioUnlock"
+      class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
+    >
+      <div class="bg-base-100 p-6 rounded-lg shadow-xl max-w-sm mx-4 text-center">
+        <div class="text-4xl mb-4">🔊</div>
+        <h3 class="font-bold text-lg mb-2">Enable Audio</h3>
+        <p class="text-sm text-base-content opacity-75 mb-4">
+          Mobile browsers require user interaction to enable audio. Tap the button below to unlock
+          audio playback.
+        </p>
+        <button @click="unlockAudio" class="btn btn-primary btn-wide mb-2">🎵 Enable Audio</button>
+        <p class="text-xs text-base-content opacity-50">
+          This only needs to be done once per session
+        </p>
+      </div>
+    </div>
+
     <!-- Sticky Controls Header -->
     <div class="sticky top-0 z-10 bg-base-100 border-b border-base-300 shadow-md">
       <div class="p-4 max-w-3xl mx-auto">
@@ -94,13 +113,30 @@
           </div>
 
           <div class="flex gap-2 items-center">
+            <!-- Audio status indicator (for debugging) -->
+            <div
+              v-if="isMobileDevice()"
+              class="text-xs px-2 py-1 rounded"
+              :class="
+                audioUnlocked ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+              "
+            >
+              {{ audioUnlocked ? '🔊 Audio Ready' : '🔇 Audio Locked' }}
+            </div>
+
+            <!-- Manual audio unlock button for testing -->
+            <button
+              v-if="isMobileDevice() && !audioUnlocked"
+              @click="showAudioUnlock = true"
+              class="btn btn-xs btn-warning"
+            >
+              🔓 Unlock Audio
+            </button>
+
             <!-- Audio mode toggle -->
             <div class="form-control">
               <label class="label cursor-pointer gap-2">
-                <span 
-                  class="label-text text-xs"
-                  :class="{ 'text-primary': useSamples }"
-                >
+                <span class="label-text text-xs" :class="{ 'text-primary': useSamples }">
                   Samples
                 </span>
                 <input
@@ -227,7 +263,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 // @ts-ignore
 import * as MidiWriter from 'midi-writer-js'
 import * as Tone from 'tone'
@@ -254,6 +290,8 @@ const isPlaying = ref(false)
 const isControlsExpanded = ref(true)
 const currentPlayingIndex = ref(-1)
 const useSamples = ref(true) // Toggle between samples and MIDI tones
+const showAudioUnlock = ref(false) // Show audio unlock modal for mobile
+const audioUnlocked = ref(false) // Track if audio has been unlocked
 // Sample players for your MP3 files - using multiple instances to avoid choppiness
 let topSamplePlayers: Tone.Player[] = []
 let chugSamplePlayers: Tone.Player[] = []
@@ -278,10 +316,10 @@ let snareTimeoutId: number | null = null
 
 // Sample file paths - make sure these MP3 files are in your public/samples folder
 const SAMPLE_PATHS = {
-  top: '/samples/top.mp3',       // First note of each cycle
-  chug: '/samples/chug.mp3',     // Rest of the notes
-  stack: '/samples/stack.mp3',   // Quarter note metronome
-  snare: '/samples/snare.mp3'    // Snare on beat 3
+  top: '/samples/top.mp3', // First note of each cycle
+  chug: '/samples/chug.mp3', // Rest of the notes
+  stack: '/samples/stack.mp3', // Quarter note metronome
+  snare: '/samples/snare.mp3', // Snare on beat 3
 }
 
 const groupCounts = computed(() => {
@@ -529,9 +567,24 @@ function downloadMIDI() {
 async function playPreview() {
   if (!midiEvents.value.length || !selectedGrouping.value) return
 
+  // Check if audio needs to be unlocked on mobile
+  if (isMobileDevice() && !audioUnlocked.value && Tone.context.state !== 'running') {
+    console.log('Audio not unlocked on mobile, showing unlock modal')
+    showAudioUnlock.value = true
+    return
+  }
+
   try {
+    // Try to start Tone.js - this might fail on mobile if not properly unlocked
     await Tone.start()
-    console.log('Tone.js started successfully')
+    console.log('Tone.js started successfully, context state:', Tone.context.state)
+
+    // If we're on mobile and this is the first successful start, mark as unlocked
+    if (isMobileDevice() && !audioUnlocked.value && Tone.context.state === 'running') {
+      audioUnlocked.value = true
+      console.log('Audio automatically unlocked during playback')
+    }
+
     stopPreview()
 
     isPlaying.value = true
@@ -541,60 +594,60 @@ async function playPreview() {
       console.log('Using samples mode')
       // Create multiple sample players for smoother playback (round-robin)
       const numPlayers = 6 // Increase to 6 instances for production stability
-      
+
       topSamplePlayers = []
       chugSamplePlayers = []
-      
+
       // Create players with explicit loading and error handling
       const createPlayersPromises = []
-      
+
       for (let i = 0; i < numPlayers; i++) {
         const topPlayer = new Tone.Player({
           url: SAMPLE_PATHS.top,
           onload: () => console.log(`Top player ${i} loaded`),
-          onerror: (error) => console.error(`Top player ${i} error:`, error)
+          onerror: (error) => console.error(`Top player ${i} error:`, error),
         }).toDestination()
-        
+
         const chugPlayer = new Tone.Player({
           url: SAMPLE_PATHS.chug,
           onload: () => console.log(`Chug player ${i} loaded`),
-          onerror: (error) => console.error(`Chug player ${i} error:`, error)
+          onerror: (error) => console.error(`Chug player ${i} error:`, error),
         }).toDestination()
-        
+
         topSamplePlayers.push(topPlayer)
         chugSamplePlayers.push(chugPlayer)
-        
+
         // Add individual loading promises
         createPlayersPromises.push(
-          new Promise(resolve => {
+          new Promise((resolve) => {
             if (topPlayer.loaded) {
               resolve(`top-${i}`)
             } else {
               topPlayer.load(SAMPLE_PATHS.top).then(() => resolve(`top-${i}`))
             }
-          })
+          }),
         )
         createPlayersPromises.push(
-          new Promise(resolve => {
+          new Promise((resolve) => {
             if (chugPlayer.loaded) {
               resolve(`chug-${i}`)
             } else {
               chugPlayer.load(SAMPLE_PATHS.chug).then(() => resolve(`chug-${i}`))
             }
-          })
+          }),
         )
       }
-      
+
       stackSamplePlayer = new Tone.Player({
         url: SAMPLE_PATHS.stack,
         onload: () => console.log('Stack player loaded'),
-        onerror: (error) => console.error('Stack player error:', error)
+        onerror: (error) => console.error('Stack player error:', error),
       }).toDestination()
-      
+
       snareSamplePlayer = new Tone.Player({
         url: SAMPLE_PATHS.snare,
         onload: () => console.log('Snare player loaded'),
-        onerror: (error) => console.error('Snare player error:', error)
+        onerror: (error) => console.error('Snare player error:', error),
       }).toDestination()
 
       // Wait for ALL samples to load with timeout
@@ -604,19 +657,19 @@ async function playPreview() {
           Promise.all([
             ...createPlayersPromises,
             stackSamplePlayer.load(SAMPLE_PATHS.stack),
-            snareSamplePlayer.load(SAMPLE_PATHS.snare)
+            snareSamplePlayer.load(SAMPLE_PATHS.snare),
           ]),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Sample loading timeout')), 10000)
-          )
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Sample loading timeout')), 10000),
+          ),
         ])
         console.log('All samples loaded successfully')
-        
+
         // Add a small delay to ensure everything is ready
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       } catch (error) {
         console.error('Sample loading failed:', error)
-        alert('Failed to load audio samples. Using MIDI fallback.')
+        console.log('Falling back to MIDI synths for mobile compatibility')
         useSamples.value = false
         return playPreview() // Retry with MIDI
       }
@@ -645,7 +698,7 @@ async function playPreview() {
 
       clickTimeoutId = window.setTimeout(() => {
         if (!isPlaying.value) return
-        
+
         if (useSamples.value) {
           if (stackSamplePlayer && stackSamplePlayer.loaded) {
             stackSamplePlayer.stop()
@@ -669,7 +722,7 @@ async function playPreview() {
 
       snareTimeoutId = window.setTimeout(() => {
         if (!isPlaying.value) return
-        
+
         if (useSamples.value) {
           if (snareSamplePlayer && snareSamplePlayer.loaded) {
             snareSamplePlayer.stop()
@@ -711,8 +764,8 @@ async function playPreview() {
 
       if (useSamples.value) {
         // Play the appropriate sample using round-robin to avoid choppiness
-        const isFirstNoteOfCycle = (eventIndex % groupingLength) === 0
-        
+        const isFirstNoteOfCycle = eventIndex % groupingLength === 0
+
         if (isFirstNoteOfCycle) {
           const player = topSamplePlayers[topPlayerIndex]
           if (player && player.loaded) {
@@ -760,21 +813,21 @@ function stopPreview() {
   currentPlayingIndex.value = -1
 
   // Clear all timeouts to prevent overlapping samples
-  activeTimeouts.forEach(id => window.clearTimeout(id))
+  activeTimeouts.forEach((id) => window.clearTimeout(id))
   activeTimeouts = []
-  
+
   if (clickTimeoutId !== null) {
     window.clearTimeout(clickTimeoutId)
     clickTimeoutId = null
   }
-  
+
   if (snareTimeoutId !== null) {
     window.clearTimeout(snareTimeoutId)
     snareTimeoutId = null
   }
 
   // Stop and dispose sample players
-  topSamplePlayers.forEach(player => {
+  topSamplePlayers.forEach((player) => {
     if (player) {
       player.stop()
       player.dispose()
@@ -782,8 +835,8 @@ function stopPreview() {
   })
   topSamplePlayers = []
   topPlayerIndex = 0
-  
-  chugSamplePlayers.forEach(player => {
+
+  chugSamplePlayers.forEach((player) => {
     if (player) {
       player.stop()
       player.dispose()
@@ -816,4 +869,109 @@ function stopPreview() {
     snareSynth = null
   }
 }
+
+// Mobile audio unlock functionality
+function isMobileDevice() {
+  // Check for touch capability and mobile user agents
+  const hasTouchScreen =
+    'ontouchstart' in window ||
+    (window.navigator.maxTouchPoints && window.navigator.maxTouchPoints > 0)
+  const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  )
+  const smallScreen = window.innerWidth <= 768 // Consider small screens as potentially mobile
+
+  return hasTouchScreen && (mobileUserAgent || smallScreen)
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+}
+
+async function unlockAudio() {
+  try {
+    console.log('Attempting to unlock audio...')
+
+    // Start Tone.js context - this requires user gesture on mobile
+    await Tone.start()
+    console.log('Tone.js context state:', Tone.context.state)
+
+    // Test that audio actually works by playing a very brief, quiet tone
+    if (Tone.context.state === 'running') {
+      const testSynth = new Tone.Oscillator(440, 'sine').toDestination()
+      testSynth.volume.value = -50 // Very quiet
+      testSynth.start()
+      testSynth.stop('+0.01') // Play for 10ms
+
+      // Dispose after playing
+      setTimeout(() => {
+        testSynth.dispose()
+      }, 100)
+
+      audioUnlocked.value = true
+      showAudioUnlock.value = false
+
+      console.log('Audio unlock completed successfully')
+    } else {
+      throw new Error('Audio context did not start properly')
+    }
+  } catch (error) {
+    console.error('Failed to unlock audio:', error)
+    // Still hide the modal - user can try playing normally
+    showAudioUnlock.value = false
+    // Show a brief notification that they may need to try again
+    console.warn('Audio unlock failed. User may need to try playing audio again.')
+  }
+}
+
+// Check if we need to show audio unlock on mobile
+function checkAudioUnlockNeeded() {
+  const needsUnlock = isMobileDevice() && !audioUnlocked.value && Tone.context.state !== 'running'
+
+  if (needsUnlock) {
+    console.log('Mobile device detected with locked audio context, showing unlock modal')
+    console.log('Device info:', {
+      userAgent: navigator.userAgent,
+      touchPoints: window.navigator.maxTouchPoints,
+      screenWidth: window.innerWidth,
+      toneState: Tone.context.state,
+    })
+    showAudioUnlock.value = true
+  } else {
+    console.log('Audio unlock not needed:', {
+      isMobile: isMobileDevice(),
+      audioUnlocked: audioUnlocked.value,
+      toneState: Tone.context.state,
+    })
+  }
+}
+
+// Initialize mobile detection on component mount
+onMounted(() => {
+  console.log('🚀 THIRTYTHR33 Component mounted')
+  console.log('📱 Device info:', {
+    userAgent: navigator.userAgent,
+    touchPoints: window.navigator.maxTouchPoints,
+    screenWidth: window.innerWidth,
+    isMobile: isMobileDevice(),
+    isIOS: isIOS(),
+  })
+
+  // Check if we need audio unlock after a short delay to ensure DOM is ready
+  setTimeout(() => {
+    console.log('🔍 Checking audio unlock needed...')
+    checkAudioUnlockNeeded()
+  }, 100)
+
+  // Also check when user first interacts with any button that might trigger audio
+  const handleFirstClick = () => {
+    console.log('👆 First click detected')
+    if (!audioUnlocked.value && isMobileDevice()) {
+      checkAudioUnlockNeeded()
+    }
+  }
+
+  // Listen for clicks on play buttons specifically
+  document.addEventListener('click', handleFirstClick, { once: true })
+})
 </script>

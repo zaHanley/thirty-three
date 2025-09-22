@@ -26,8 +26,8 @@ export default defineConfig({
             return 'samples/[name][extname]'
           }
           return 'assets/[name]-[hash][extname]'
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 })
