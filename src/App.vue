@@ -35,9 +35,13 @@
     <div>
       <button
         @click="generateGroupings"
+        :disabled="isGenerating"
         class="btn btn-sm btn-primary text-primary-content rounded"
       >
-        Generate
+        <span v-if="isGenerating" class="animate-pulse"
+          >This is so many possibilities, dude. Use the filters.</span
+        >
+        <span v-else>Generate</span>
       </button>
     </div>
 
@@ -100,7 +104,7 @@
                 @click="selectGrouping(g)"
                 class="btn btn-xs px-3 py-1 rounded border"
                 :class="{
-                  'btn-success text-success-content': selectedGrouping === g && !isPlaying,
+                  'btn-primary text-success-content': selectedGrouping === g && !isPlaying,
                   'btn-error': selectedGrouping === g && isPlaying,
                 }"
               >
@@ -154,6 +158,7 @@ const phraseBars = ref(8)
 const pitch = ref(42)
 const maxRepeat = ref(1)
 
+const isGenerating = ref(false)
 const enabledPartitions = ref(new Set([2, 3, 5, 7, 9]))
 const groupings = ref<number[][]>([])
 const groupedGroupings = ref<Record<number, number[][]>>({})
@@ -222,41 +227,48 @@ function togglePartition(partitionValue: number) {
   }
 }
 function generateGroupings() {
-  const [num, denom] = guestCycle.value.split('/').map(Number)
-  if (denom !== 16) {
-    alert('Only 16th-note based guests supported for now')
-    return
-  }
-  const rawGroupings: number[][] = []
-  const allowedPartitions = Array.from(enabledPartitions.value).sort((a, b) => a - b)
-  generatePartitions(num, allowedPartitions, [], rawGroupings)
+  isGenerating.value = true
 
-  groupings.value = rawGroupings.filter((g) => {
-    const unique = new Set(g)
-    if (unique.size <= 1) return false
-    if (!(unique.has(5) || unique.has(7))) return false
-    if (hasTooManyConsecutive(g, 2, maxRepeat.value)) return false
-
-    // Check that 1s only appear directly before or after numbers >= 3
-    for (let i = 0; i < g.length; i++) {
-      if (g[i] === 1) {
-        const prevValid = i > 0 && g[i - 1] >= 3
-        const nextValid = i < g.length - 1 && g[i + 1] >= 3
-        if (!prevValid && !nextValid) return false
-      }
+  // Use setTimeout to allow the UI to update before heavy computation
+  setTimeout(() => {
+    const [num, denom] = guestCycle.value.split('/').map(Number)
+    if (denom !== 16) {
+      alert('Only 16th-note based guests supported for now')
+      isGenerating.value = false
+      return
     }
+    const rawGroupings: number[][] = []
+    const allowedPartitions = Array.from(enabledPartitions.value).sort((a, b) => a - b)
+    generatePartitions(num, allowedPartitions, [], rawGroupings)
 
-    // Check that there are never two 1s directly adjacent to each other
-    for (let i = 0; i < g.length - 1; i++) {
-      if (g[i] === 1 && g[i + 1] === 1) {
-        return false
+    groupings.value = rawGroupings.filter((g) => {
+      const unique = new Set(g)
+      if (unique.size <= 1) return false
+      if (!(unique.has(5) || unique.has(7))) return false
+      if (hasTooManyConsecutive(g, 2, maxRepeat.value)) return false
+
+      // Check that 1s only appear directly before or after numbers >= 3
+      for (let i = 0; i < g.length; i++) {
+        if (g[i] === 1) {
+          const prevValid = i > 0 && g[i - 1] >= 3
+          const nextValid = i < g.length - 1 && g[i + 1] >= 3
+          if (!prevValid && !nextValid) return false
+        }
       }
-    }
 
-    return true
-  })
+      // Check that there are never two 1s directly adjacent to each other
+      for (let i = 0; i < g.length - 1; i++) {
+        if (g[i] === 1 && g[i + 1] === 1) {
+          return false
+        }
+      }
 
-  sortGroupings()
+      return true
+    })
+
+    sortGroupings()
+    isGenerating.value = false
+  }, 10)
 }
 
 function hasTooManyConsecutive(arr: number[], value: number, maxRun: number) {
