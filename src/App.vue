@@ -1,147 +1,194 @@
 <template>
-  <div class="p-6 space-y-4 max-w-3xl mx-auto mt-10">
-    <h1 class="text-4xl font-bold">THIRTYTHR33</h1>
-    <div class="flex flex-row gap-1 w-full">
-      <div class="flex flex-col gap-1">
-        <label class="input rounded">
-          <span class="text-secondary">Tempo</span>
-          <input v-model.number="tempo" type="number" placeholder="120" />
-        </label>
-        <label class="input rounded">
-          <span class="text-secondary">Host</span>
-          <input v-model="hostTimeSig" type="text" placeholder="4/4" />
-        </label>
-        <label class="input rounded">
-          <span class="text-secondary">Guest</span>
-          <input v-model="guestCycle" type="text" placeholder="19/16" />
-        </label>
-      </div>
-      <div class="flex flex-col gap-1">
-        <label class="input rounded">
-          <span class="text-secondary">Bars</span>
-          <input v-model.number="phraseBars" type="number" placeholder="8" />
-        </label>
-        <label class="input rounded">
-          <span class="text-secondary">Pitch</span>
-          <input v-model.number="pitch" type="number" placeholder="41" />
-        </label>
-        <label class="input rounded">
-          <span class="text-secondary">Max Repeat</span>
-          <input v-model.number="maxRepeat" type="number" placeholder="3" />
-        </label>
-      </div>
-    </div>
-
-    <div>
-      <button
-        @click="generateGroupings"
-        :disabled="isGenerating"
-        class="btn btn-sm btn-primary text-primary-content rounded"
-      >
-        <span v-if="isGenerating" class="animate-pulse"
-          >This is so many possibilities, dude. Use the filters.</span
-        >
-        <span v-else>Generate</span>
-      </button>
-    </div>
-
-    <!-- Partition selection controls -->
-    <div class="mb-4 p-3 bg-base-200 rounded">
-      <h3 class="text-sm font-medium mb-2">Enabled Durations:</h3>
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="partitionValue in [1, 2, 3, 4, 5, 6, 7, 9]"
-          :key="partitionValue"
-          @click="togglePartition(partitionValue)"
-          class="btn btn-xs rounded"
-          :class="{
-            'btn-primary': enabledPartitions.has(partitionValue),
-            'btn-outline': !enabledPartitions.has(partitionValue),
-          }"
-        >
-          {{ partitionValue }}
-        </button>
-      </div>
-    </div>
-
-    <div v-if="groupings.length">
-      <h2 class="font-semibold">Select a grouping:</h2>
-
-      <!-- Group visibility controls -->
-      <div class="mb-4 p-3 bg-base-200 rounded">
-        <h3 class="text-sm font-medium mb-2">Show/Hide Groups:</h3>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="firstValue in [1, 2, 3, 4, 5, 6, 7, 9]"
-            :key="firstValue"
-            @click="toggleGroupVisibility(firstValue)"
-            class="btn btn-xs rounded"
-            :class="{
-              'btn-primary': visibleGroups.has(firstValue),
-              'btn-outline': !visibleGroups.has(firstValue),
-            }"
-          >
-            {{ firstValue }} ({{ groupCounts[firstValue] }})
+  <div class="min-h-screen overflow-y-scroll">
+    <!-- Sticky Controls Header -->
+    <div class="sticky top-0 z-10 bg-base-100 border-b border-base-300 shadow-md">
+      <div class="p-4 max-w-3xl mx-auto">
+        <div class="flex items-center justify-between mb-2">
+          <h1 class="text-2xl font-bold">THIRTYTHR33</h1>
+          <button @click="isControlsExpanded = !isControlsExpanded" class="btn btn-xs btn-circle">
+            <span v-if="isControlsExpanded">−</span>
+            <span v-else>+</span>
           </button>
         </div>
-      </div>
 
-      <div class="space-y-2">
-        <details
-          v-for="firstValue in [1, 2, 3, 4, 5, 6, 7, 9].filter((v) => groupCounts[v] > 0)"
-          :key="firstValue"
-          class="collapse bg-base-100 border-base-300 border"
-          :class="{ hidden: !visibleGroups.has(firstValue) }"
-        >
-          <summary class="collapse-title font-semibold">
-            Starting with {{ firstValue }} ({{ groupCounts[firstValue] }} groupings)
-          </summary>
-          <div class="collapse-content">
-            <div class="flex flex-wrap gap-2 p-2">
+        <div v-show="isControlsExpanded" class="space-y-3">
+          <div class="flex gap-3 w-full">
+            <!-- Input fields section -->
+            <div class="flex-[2] p-2 bg-base-200 rounded">
+              <div class="flex flex-row gap-1 w-full">
+                <div class="flex flex-col gap-1">
+                  <label class="input input-sm rounded">
+                    <span class="text-secondary text-xs">Tempo</span>
+                    <input v-model.number="tempo" type="number" placeholder="120" class="text-sm" />
+                  </label>
+                  <label class="input input-sm rounded">
+                    <span class="text-secondary text-xs">Host</span>
+                    <input v-model="hostTimeSig" type="text" placeholder="4/4" class="text-sm" />
+                  </label>
+                  <label class="input input-sm rounded">
+                    <span class="text-secondary text-xs">Guest</span>
+                    <input v-model="guestCycle" type="text" placeholder="19/16" class="text-sm" />
+                  </label>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="input input-sm rounded">
+                    <span class="text-secondary text-xs">Bars</span>
+                    <input
+                      v-model.number="phraseBars"
+                      type="number"
+                      placeholder="8"
+                      class="text-sm"
+                    />
+                  </label>
+                  <label class="input input-sm rounded">
+                    <span class="text-secondary text-xs">Pitch</span>
+                    <input v-model.number="pitch" type="number" placeholder="41" class="text-sm" />
+                  </label>
+                  <label class="input input-sm rounded">
+                    <span class="text-secondary text-xs">Max Repeat</span>
+                    <input
+                      v-model.number="maxRepeat"
+                      type="number"
+                      placeholder="3"
+                      class="text-sm"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Partition selection controls -->
+            <div class="flex-1 p-2 bg-base-200 rounded">
+              <h3 class="text-xs font-medium mb-1">Enabled Durations:</h3>
+              <div class="flex flex-col gap-1">
+                <div class="flex gap-1">
+                  <button
+                    v-for="partitionValue in [1, 2, 3, 4]"
+                    :key="partitionValue"
+                    @click="togglePartition(partitionValue)"
+                    class="btn btn-xs rounded flex-1"
+                    :class="{
+                      'btn-primary': enabledPartitions.has(partitionValue),
+                      'btn-outline': !enabledPartitions.has(partitionValue),
+                    }"
+                  >
+                    {{ partitionValue }}
+                  </button>
+                </div>
+                <div class="flex gap-1">
+                  <button
+                    v-for="partitionValue in [5, 6, 7, 9]"
+                    :key="partitionValue"
+                    @click="togglePartition(partitionValue)"
+                    class="btn btn-xs rounded flex-1"
+                    :class="{
+                      'btn-primary': enabledPartitions.has(partitionValue),
+                      'btn-outline': !enabledPartitions.has(partitionValue),
+                    }"
+                  >
+                    {{ partitionValue }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <button
+              @click="generateGroupings"
+              :disabled="isGenerating"
+              class="btn btn-sm btn-primary text-primary-content rounded"
+            >
+              <span v-if="isGenerating" class="animate-pulse"
+                >This is so many possibilities, dude. Use the filters.</span
+              >
+              <span v-else>Generate</span>
+            </button>
+          </div>
+
+          <!-- Group visibility controls -->
+          <div v-if="groupings.length" class="p-2 bg-base-200 rounded">
+            <h3 class="text-xs font-medium mb-1">Show/Hide Groups:</h3>
+            <div class="flex flex-wrap gap-1">
               <button
-                v-for="(g, i) in groupedGroupings[firstValue] || []"
-                :key="`${firstValue}-${i}`"
-                @click="selectGrouping(g)"
-                class="btn btn-xs px-3 py-1 rounded border"
+                v-for="firstValue in [1, 2, 3, 4, 5, 6, 7, 9]"
+                :key="firstValue"
+                @click="toggleGroupVisibility(firstValue)"
+                class="btn btn-xs rounded"
                 :class="{
-                  'btn-primary text-success-content': selectedGrouping === g && !isPlaying,
-                  'btn-error': selectedGrouping === g && isPlaying,
+                  'btn-primary': visibleGroups.has(firstValue),
+                  'btn-outline': !visibleGroups.has(firstValue),
                 }"
               >
-                {{ g.join('-') }}
+                {{ firstValue }} ({{ groupCounts[firstValue] }})
               </button>
             </div>
           </div>
-        </details>
+        </div>
       </div>
     </div>
 
-    <div v-if="selectedGrouping">
-      <h2 class="font-semibold">Selected grouping: {{ selectedGrouping.join('-') }}</h2>
-      <p>Full cycles: {{ fullCycles }}</p>
-      <p>Truncation length: {{ truncation }}/16</p>
-      <button
-        v-if="midiUrl"
-        @click="downloadMIDI"
-        class="btn px-4 py-2 bg-purple-600 text-white rounded"
-      >
-        Download MIDI
-      </button>
-      <button
-        v-if="midiEvents.length && !isPlaying"
-        @click="isPlaying ? stopPreview() : playPreview()"
-        class="btn px-4 py-2 bg-green-600 text-white rounded"
-        :class="{ 'bg-warning text-success-content': isPlaying }"
-      >
-        Play
-      </button>
-      <button
-        v-if="isPlaying"
-        @click="stopPreview"
-        class="btn px-4 py-2 bg-red-600 text-white rounded"
-      >
-        Stop
-      </button>
+    <!-- Main Content -->
+    <div class="p-6 max-w-3xl mx-auto space-y-4">
+      <div v-if="groupings.length">
+        <h2 class="font-semibold mb-4">Select a grouping:</h2>
+
+        <div class="space-y-2">
+          <details
+            v-for="firstValue in [1, 2, 3, 4, 5, 6, 7, 9].filter((v) => groupCounts[v] > 0)"
+            :key="firstValue"
+            class="collapse bg-base-200 border-base-300 border"
+            :class="{ hidden: !visibleGroups.has(firstValue) }"
+          >
+            <summary class="collapse-title font-semibold">
+              Starting with {{ firstValue }} ({{ groupCounts[firstValue] }} groupings)
+            </summary>
+            <div class="collapse-content">
+              <div class="flex flex-wrap gap-2 p-2 max-h-40 overflow-y-auto">
+                <button
+                  v-for="(g, i) in groupedGroupings[firstValue] || []"
+                  :key="`${firstValue}-${i}`"
+                  @click="selectGrouping(g)"
+                  class="btn btn-neutral btn-xs px-3 py-1 rounded border"
+                  :class="{
+                    'text-primary': selectedGrouping === g && !isPlaying,
+                    'text-error': selectedGrouping === g && isPlaying,
+                  }"
+                  v-html="getButtonContent(g)"
+                ></button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div v-if="selectedGrouping">
+        <h2 class="font-semibold">Selected grouping: {{ selectedGrouping.join('-') }}</h2>
+        <p>Full cycles: {{ fullCycles }}</p>
+        <p>Truncation length: {{ truncation }}/16</p>
+        <button
+          v-if="midiUrl"
+          @click="downloadMIDI"
+          class="btn px-4 py-2 bg-purple-600 text-white rounded"
+        >
+          Download MIDI
+        </button>
+        <button
+          v-if="midiEvents.length && !isPlaying"
+          @click="isPlaying ? stopPreview() : playPreview()"
+          class="btn px-4 py-2 bg-green-600 text-white rounded"
+          :class="{ 'bg-warning text-success-content': isPlaying }"
+        >
+          Play
+        </button>
+        <button
+          v-if="isPlaying"
+          @click="stopPreview"
+          class="btn px-4 py-2 bg-red-600 text-white rounded"
+        >
+          Stop
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -170,6 +217,8 @@ const fullCycles = ref(0)
 const midiUrl = ref<string | null>(null)
 const midiEvents = ref<{ pitch: number; duration: number }[]>([])
 const isPlaying = ref(false)
+const isControlsExpanded = ref(true)
+const currentPlayingIndex = ref(-1)
 let synth: Tone.PolySynth | null = null
 let clickSynth: Tone.MetalSynth | null = null
 let clickLoop: Tone.Loop | null = null
@@ -181,6 +230,19 @@ const groupCounts = computed(() => {
   }
   return counts
 })
+
+const getButtonContent = (g: number[]) => {
+  if (!isPlaying.value || selectedGrouping.value !== g) {
+    return g.join(' ')
+  }
+
+  return g
+    .map((num, index) => {
+      const colorClass = index === currentPlayingIndex.value ? 'text-warning' : 'text-success'
+      return `<span class="${colorClass}">${num}</span>`
+    })
+    .join('')
+}
 
 function sortGroupings() {
   groupings.value = groupings.value.sort((a, b) => {
@@ -384,10 +446,11 @@ function downloadMIDI() {
 }
 
 async function playPreview() {
-  if (!midiEvents.value.length) return
+  if (!midiEvents.value.length || !selectedGrouping.value) return
   await Tone.start()
   stopPreview()
   isPlaying.value = true
+  currentPlayingIndex.value = 0
 
   synth = new Tone.PolySynth().toDestination()
   clickSynth = new Tone.MetalSynth().toDestination()
@@ -401,16 +464,39 @@ async function playPreview() {
   }, beatDuration).start(0)
 
   let now = Tone.now()
-  for (let e of midiEvents.value) {
+  const groupingLength = selectedGrouping.value.length
+
+  for (let i = 0; i < midiEvents.value.length; i++) {
+    const e = midiEvents.value[i]
     const durSeconds = e.duration * (60 / tempo.value / 4)
+
+    // Schedule the note
     if (synth) synth.triggerAttackRelease(Tone.Frequency(e.pitch, 'midi'), durSeconds, now)
+
+    // Schedule the visual update - ensure it cycles within grouping bounds
+    const positionInCycle = i % groupingLength
+    Tone.Transport.schedule(() => {
+      // Make sure the index is valid
+      if (positionInCycle >= 0 && positionInCycle < groupingLength) {
+        currentPlayingIndex.value = positionInCycle
+      }
+    }, now)
+
     now += durSeconds
   }
+
+  // Reset the playing index when playback ends
+  Tone.Transport.schedule(() => {
+    currentPlayingIndex.value = -1
+    isPlaying.value = false
+  }, now)
+
   Tone.Transport.start()
 }
 
 function stopPreview() {
   isPlaying.value = false
+  currentPlayingIndex.value = -1
   if (synth) {
     synth.dispose()
     synth = null
