@@ -21,9 +21,9 @@
 
     <!-- Sticky Controls Header -->
     <div class="sticky top-0 z-10 bg-base-100 border-b border-base-300 shadow-md">
-      <div class="p-4 max-w-3xl mx-auto">
+      <div class="p-3 sm:p-4 max-w-3xl mx-auto">
         <div class="flex items-center justify-between mb-2">
-          <h1 class="text-2xl font-bold">THIRTYTHR33</h1>
+          <h1 class="text-xl sm:text-2xl font-bold">THIRTYTHR33</h1>
           <button @click="isControlsExpanded = !isControlsExpanded" class="btn btn-xs btn-circle">
             <span v-if="isControlsExpanded">−</span>
             <span v-else>+</span>
@@ -31,45 +31,67 @@
         </div>
 
         <div v-show="isControlsExpanded" class="space-y-3">
-          <div class="flex gap-3 w-full">
+          <!-- Mobile: Stack vertically, Desktop: Side by side -->
+          <div class="flex flex-col lg:flex-row gap-3 w-full">
             <!-- Input fields section -->
-            <div class="flex-[2] p-2 bg-base-200 rounded">
-              <div class="flex flex-row gap-1 w-full">
-                <div class="flex flex-col gap-1">
-                  <label class="input input-sm rounded">
+            <div class="w-full lg:flex-[2] p-3 bg-base-200 rounded">
+              <!-- Mobile: Single column, Desktop: Two columns -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                <div class="space-y-2">
+                  <label class="input input-sm rounded w-full">
                     <span class="text-secondary text-xs">Tempo</span>
-                    <input v-model.number="tempo" type="number" placeholder="120" class="text-sm" />
+                    <input
+                      v-model.number="tempo"
+                      type="number"
+                      placeholder="120"
+                      class="text-sm w-full"
+                    />
                   </label>
-                  <label class="input input-sm rounded">
+                  <label class="input input-sm rounded w-full">
                     <span class="text-secondary text-xs">Host</span>
-                    <input v-model="hostTimeSig" type="text" placeholder="4/4" class="text-sm" />
+                    <input
+                      v-model="hostTimeSig"
+                      type="text"
+                      placeholder="4/4"
+                      class="text-sm w-full"
+                    />
                   </label>
-                  <label class="input input-sm rounded">
+                  <label class="input input-sm rounded w-full">
                     <span class="text-secondary text-xs">Guest</span>
-                    <input v-model="guestCycle" type="text" placeholder="25/16" class="text-sm" />
+                    <input
+                      v-model="guestCycle"
+                      type="text"
+                      placeholder="25/16"
+                      class="text-sm w-full"
+                    />
                   </label>
                 </div>
-                <div class="flex flex-col gap-1">
-                  <label class="input input-sm rounded">
+                <div class="space-y-2">
+                  <label class="input input-sm rounded w-full">
                     <span class="text-secondary text-xs">Bars</span>
                     <input
                       v-model.number="phraseBars"
                       type="number"
                       placeholder="8"
-                      class="text-sm"
+                      class="text-sm w-full"
                     />
                   </label>
-                  <label class="input input-sm rounded">
+                  <label class="input input-sm rounded w-full">
                     <span class="text-secondary text-xs">Pitch</span>
-                    <input v-model.number="pitch" type="number" placeholder="41" class="text-sm" />
+                    <input
+                      v-model.number="pitch"
+                      type="number"
+                      placeholder="41"
+                      class="text-sm w-full"
+                    />
                   </label>
-                  <label class="input input-sm rounded">
+                  <label class="input input-sm rounded w-full">
                     <span class="text-secondary text-xs">Max Repeat</span>
                     <input
                       v-model.number="maxRepeat"
                       type="number"
                       placeholder="3"
-                      class="text-sm"
+                      class="text-sm w-full"
                     />
                   </label>
                 </div>
@@ -77,15 +99,15 @@
             </div>
 
             <!-- Partition selection controls -->
-            <div class="flex-1 p-2 bg-base-200 rounded">
-              <h3 class="text-xs font-medium mb-1">Enabled Durations:</h3>
-              <div class="flex flex-col gap-1">
-                <div class="flex gap-1">
+            <div class="w-full lg:flex-1 p-3 bg-base-200 rounded">
+              <h3 class="text-xs font-medium mb-2">Enabled Durations:</h3>
+              <div class="space-y-2">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     v-for="partitionValue in [1, 2, 3, 4]"
                     :key="partitionValue"
                     @click="togglePartition(partitionValue)"
-                    class="btn btn-xs rounded flex-1"
+                    class="btn btn-xs rounded min-h-[2rem] text-xs"
                     :class="{
                       'btn-primary': enabledPartitions.has(partitionValue),
                       'btn-outline': !enabledPartitions.has(partitionValue),
@@ -94,12 +116,12 @@
                     {{ partitionValue }}
                   </button>
                 </div>
-                <div class="flex gap-1">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     v-for="partitionValue in [5, 6, 7, 9]"
                     :key="partitionValue"
                     @click="togglePartition(partitionValue)"
-                    class="btn btn-xs rounded flex-1"
+                    class="btn btn-xs rounded min-h-[2rem] text-xs"
                     :class="{
                       'btn-primary': enabledPartitions.has(partitionValue),
                       'btn-outline': !enabledPartitions.has(partitionValue),
@@ -112,83 +134,90 @@
             </div>
           </div>
 
-          <div class="flex gap-2 items-center">
-            <!-- Audio status indicator (for debugging) -->
-            <div
-              v-if="isMobileDevice()"
-              class="text-xs px-2 py-1 rounded"
-              :class="
-                audioUnlocked ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-              "
-            >
-              {{ audioUnlocked ? '🔊 Audio Ready' : '🔇 Audio Locked' }}
+          <!-- Mobile-friendly controls section -->
+          <div class="space-y-3">
+            <!-- Mobile: Stack all controls vertically -->
+            <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+              <!-- Audio status indicator (for debugging) -->
+              <div
+                v-if="isMobileDevice()"
+                class="text-xs px-2 py-1 rounded whitespace-nowrap"
+                :class="
+                  audioUnlocked ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                "
+              >
+                {{ audioUnlocked ? '🔊 Audio Ready' : '🔇 Audio Locked' }}
+              </div>
+
+              <!-- Manual audio unlock button for testing -->
+              <button
+                v-if="isMobileDevice() && !audioUnlocked"
+                @click="showAudioUnlock = true"
+                class="btn btn-xs btn-warning whitespace-nowrap"
+              >
+                🔓 Unlock Audio
+              </button>
+
+              <!-- Audio mode toggle -->
+              <div class="form-control">
+                <label class="label cursor-pointer gap-2">
+                  <span class="label-text text-xs" :class="{ 'text-primary': useSamples }">
+                    Samples
+                  </span>
+                  <input
+                    type="checkbox"
+                    v-model="useSamples"
+                    class="toggle toggle-xs toggle-primary"
+                  />
+                </label>
+              </div>
             </div>
 
-            <!-- Manual audio unlock button for testing -->
-            <button
-              v-if="isMobileDevice() && !audioUnlocked"
-              @click="showAudioUnlock = true"
-              class="btn btn-xs btn-warning"
-            >
-              🔓 Unlock Audio
-            </button>
-
-            <!-- Audio mode toggle -->
-            <div class="form-control">
-              <label class="label cursor-pointer gap-2">
-                <span class="label-text text-xs" :class="{ 'text-primary': useSamples }">
-                  Samples
-                </span>
-                <input
-                  type="checkbox"
-                  v-model="useSamples"
-                  class="toggle toggle-xs toggle-primary"
-                />
-              </label>
-            </div>
-
-            <button
-              @click="generateGroupings"
-              :disabled="isGenerating"
-              class="btn btn-sm btn-primary text-primary-content rounded"
-            >
-              <span v-if="isGenerating" class="animate-pulse"
-                >Be patient, you can't even count this high</span
-              >
-              <span v-else>Generate</span>
-            </button>
-
-            <button
-              v-if="groupings.length > 0"
-              @click="selectRandomGrouping"
-              class="btn btn-sm btn-secondary rounded"
-            >
-              Random
-            </button>
-
-            <!-- Action buttons that appear when grouping is selected -->
-            <div v-if="selectedGrouping" class="flex gap-2">
+            <!-- Main action buttons - mobile responsive -->
+            <div class="flex flex-col sm:flex-row gap-2 w-full">
               <button
-                v-if="midiUrl"
-                @click="downloadMIDI"
-                class="btn btn-sm bg-purple-600 text-white rounded"
+                @click="generateGroupings"
+                :disabled="isGenerating"
+                class="btn btn-sm btn-primary text-primary-content rounded flex-1 sm:flex-none"
               >
-                Download MIDI
+                <span v-if="isGenerating" class="animate-pulse text-center block"
+                  >Be patient, you can't even count this high</span
+                >
+                <span v-else>Generate</span>
               </button>
+
               <button
-                v-if="midiEvents.length && !isPlaying"
-                @click="playPreview()"
-                class="btn btn-sm bg-green-600 text-white rounded"
+                v-if="groupings.length > 0"
+                @click="selectRandomGrouping"
+                class="btn btn-sm btn-secondary rounded flex-1 sm:flex-none"
               >
-                Play
+                Random
               </button>
-              <button
-                v-if="isPlaying"
-                @click="stopPreview"
-                class="btn btn-sm bg-red-600 text-white rounded"
-              >
-                Stop
-              </button>
+
+              <!-- Action buttons that appear when grouping is selected -->
+              <div v-if="selectedGrouping" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <button
+                  v-if="midiUrl"
+                  @click="downloadMIDI"
+                  class="btn btn-sm bg-purple-600 text-white rounded flex-1 sm:flex-none whitespace-nowrap"
+                >
+                  Download MIDI
+                </button>
+                <button
+                  v-if="midiEvents.length && !isPlaying"
+                  @click="playPreview()"
+                  class="btn btn-sm bg-green-600 text-white rounded flex-1 sm:flex-none"
+                >
+                  Play
+                </button>
+                <button
+                  v-if="isPlaying"
+                  @click="stopPreview"
+                  class="btn btn-sm bg-red-600 text-white rounded flex-1 sm:flex-none"
+                >
+                  Stop
+                </button>
+              </div>
             </div>
           </div>
 
@@ -204,14 +233,14 @@
           </div>
 
           <!-- Group visibility controls -->
-          <div v-if="groupings.length" class="p-2 bg-base-200 rounded">
-            <h3 class="text-xs font-medium mb-1">Show/Hide Groups:</h3>
-            <div class="flex flex-wrap gap-1">
+          <div v-if="groupings.length" class="p-3 bg-base-200 rounded">
+            <h3 class="text-xs font-medium mb-2">Show/Hide Groups:</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 v-for="firstValue in [1, 2, 3, 4, 5, 6, 7, 9]"
                 :key="firstValue"
                 @click="toggleGroupVisibility(firstValue)"
-                class="btn btn-xs rounded"
+                class="btn btn-xs rounded min-h-[2rem] text-xs"
                 :class="{
                   'btn-primary': visibleGroups.has(firstValue),
                   'btn-outline': !visibleGroups.has(firstValue),
@@ -226,9 +255,9 @@
     </div>
 
     <!-- Main Content -->
-    <div class="p-6 max-w-3xl mx-auto space-y-4">
+    <div class="p-3 sm:p-6 max-w-3xl mx-auto space-y-4">
       <div v-if="groupings.length">
-        <h2 class="font-semibold mb-4">Select a grouping:</h2>
+        <h2 class="font-semibold mb-4 text-center sm:text-left">Select a grouping:</h2>
 
         <div class="space-y-2">
           <details
@@ -241,15 +270,17 @@
               Starting with {{ firstValue }} ({{ groupCounts[firstValue] }} groupings)
             </summary>
             <div class="collapse-content">
-              <div class="flex flex-wrap gap-2 p-2 max-h-40 overflow-y-auto">
+              <div
+                class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3 max-h-48 overflow-y-auto"
+              >
                 <button
                   v-for="(g, i) in groupedGroupings[firstValue] || []"
                   :key="`${firstValue}-${i}`"
                   @click="selectGrouping(g)"
-                  class="btn btn-neutral btn-xs px-3 py-1 rounded border"
+                  class="btn btn-neutral btn-sm px-2 py-1 rounded border text-xs min-h-[2.5rem] h-auto whitespace-nowrap"
                   :class="{
-                    'text-primary': selectedGrouping === g && !isPlaying,
-                    'text-error': selectedGrouping === g && isPlaying,
+                    'text-primary border-primary': selectedGrouping === g && !isPlaying,
+                    'text-error border-error': selectedGrouping === g && isPlaying,
                   }"
                   v-html="getButtonContent(g)"
                 ></button>
