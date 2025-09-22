@@ -93,17 +93,53 @@
             </div>
           </div>
 
-          <div>
+          <div class="flex gap-2 items-center">
             <button
               @click="generateGroupings"
               :disabled="isGenerating"
               class="btn btn-sm btn-primary text-primary-content rounded"
             >
               <span v-if="isGenerating" class="animate-pulse"
-                >This is so many possibilities, dude. Use the filters.</span
+                >Be patient, you can't even count this high</span
               >
               <span v-else>Generate</span>
             </button>
+
+            <!-- Action buttons that appear when grouping is selected -->
+            <div v-if="selectedGrouping" class="flex gap-2">
+              <button
+                v-if="midiUrl"
+                @click="downloadMIDI"
+                class="btn btn-sm bg-purple-600 text-white rounded"
+              >
+                Download MIDI
+              </button>
+              <button
+                v-if="midiEvents.length && !isPlaying"
+                @click="playPreview()"
+                class="btn btn-sm bg-green-600 text-white rounded"
+              >
+                Play
+              </button>
+              <button
+                v-if="isPlaying"
+                @click="stopPreview"
+                class="btn btn-sm bg-red-600 text-white rounded"
+              >
+                Stop
+              </button>
+            </div>
+          </div>
+
+          <!-- Selected grouping info - full width -->
+          <div v-if="selectedGrouping" class="p-2 bg-base-200 rounded">
+            <h3 class="text-sm font-semibold mb-2">
+              {{ selectedGrouping.join(' ') }}
+            </h3>
+            <div class="text-xs text-base-content/70">
+              <p>Full cycles: {{ fullCycles }}</p>
+              <p>Truncation: {{ truncation }}/16</p>
+            </div>
           </div>
 
           <!-- Group visibility controls -->
@@ -161,34 +197,6 @@
           </details>
         </div>
       </div>
-
-      <div v-if="selectedGrouping">
-        <h2 class="font-semibold">Selected grouping: {{ selectedGrouping.join('-') }}</h2>
-        <p>Full cycles: {{ fullCycles }}</p>
-        <p>Truncation length: {{ truncation }}/16</p>
-        <button
-          v-if="midiUrl"
-          @click="downloadMIDI"
-          class="btn px-4 py-2 bg-purple-600 text-white rounded"
-        >
-          Download MIDI
-        </button>
-        <button
-          v-if="midiEvents.length && !isPlaying"
-          @click="isPlaying ? stopPreview() : playPreview()"
-          class="btn px-4 py-2 bg-green-600 text-white rounded"
-          :class="{ 'bg-warning text-success-content': isPlaying }"
-        >
-          Play
-        </button>
-        <button
-          v-if="isPlaying"
-          @click="stopPreview"
-          class="btn px-4 py-2 bg-red-600 text-white rounded"
-        >
-          Stop
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -198,7 +206,7 @@ import { ref, computed } from 'vue'
 import * as MidiWriter from 'midi-writer-js'
 import * as Tone from 'tone'
 
-const tempo = ref(120)
+const tempo = ref(130)
 const hostTimeSig = ref('4/4')
 const guestCycle = ref('19/16')
 const phraseBars = ref(8)
@@ -370,10 +378,17 @@ function computeTruncation() {
 }
 
 async function selectGrouping(g: number[]) {
-  if (isPlaying.value && selectedGrouping.value === g) {
+  // If we're playing and clicking the same grouping, stop
+  if (
+    isPlaying.value &&
+    selectedGrouping.value &&
+    selectedGrouping.value.length === g.length &&
+    selectedGrouping.value.every((val, i) => val === g[i])
+  ) {
     stopPreview()
     return
   }
+
   selectedGrouping.value = g
   generateMIDI()
   await playPreview()
@@ -447,56 +462,79 @@ function downloadMIDI() {
 
 async function playPreview() {
   if (!midiEvents.value.length || !selectedGrouping.value) return
+
   await Tone.start()
   stopPreview()
+
   isPlaying.value = true
   currentPlayingIndex.value = 0
 
   synth = new Tone.PolySynth().toDestination()
   clickSynth = new Tone.MetalSynth().toDestination()
 
-  const [hostNum, hostDen] = hostTimeSig.value.split('/').map(Number)
-  const beatDuration = 60 / tempo.value
+  // Start both the metronome and main playback at exactly the same time
+  const startTime = performance.now()
+  const beatDuration = (60 / tempo.value) * 1000 // Convert to milliseconds
 
-  // Schedule 4/4 metronome clicks
-  clickLoop = new Tone.Loop((time) => {
-    if (clickSynth) clickSynth.triggerAttackRelease('C-2', '8n', time, 0.25)
-  }, beatDuration).start(0)
+  // Metronome that stays in sync
+  function scheduleNextClick(nextClickTime: number) {
+    if (!isPlaying.value) return
 
-  let now = Tone.now()
-  const groupingLength = selectedGrouping.value.length
+    const now = performance.now()
+    const delay = Math.max(0, nextClickTime - now)
 
-  for (let i = 0; i < midiEvents.value.length; i++) {
-    const e = midiEvents.value[i]
-    const durSeconds = e.duration * (60 / tempo.value / 4)
-
-    // Schedule the note
-    if (synth) synth.triggerAttackRelease(Tone.Frequency(e.pitch, 'midi'), durSeconds, now)
-
-    // Schedule the visual update - ensure it cycles within grouping bounds
-    const positionInCycle = i % groupingLength
-    Tone.Transport.schedule(() => {
-      // Make sure the index is valid
-      if (positionInCycle >= 0 && positionInCycle < groupingLength) {
-        currentPlayingIndex.value = positionInCycle
+    setTimeout(() => {
+      if (!isPlaying.value) return
+      if (clickSynth) {
+        clickSynth.triggerAttackRelease('C-2', '32n', '+0', 0.1)
       }
-    }, now)
-
-    now += durSeconds
+      scheduleNextClick(nextClickTime + beatDuration)
+    }, delay)
   }
 
-  // Reset the playing index when playback ends
-  Tone.Transport.schedule(() => {
-    currentPlayingIndex.value = -1
-    isPlaying.value = false
-  }, now)
+  // Start the first click
+  scheduleNextClick(startTime)
 
-  Tone.Transport.start()
+  const groupingLength = selectedGrouping.value.length
+  let eventIndex = 0
+  let nextNoteTime = startTime
+
+  function playNextNote() {
+    if (!isPlaying.value) return
+
+    // If we've reached the end, loop back to the beginning
+    if (eventIndex >= midiEvents.value.length) {
+      eventIndex = 0
+    }
+
+    const event = midiEvents.value[eventIndex]
+    const durSeconds = event.duration * (60 / tempo.value / 4)
+
+    // Update visual highlighting
+    currentPlayingIndex.value = eventIndex % groupingLength
+
+    // Play the note
+    if (synth) {
+      const freq = Tone.Frequency(event.pitch, 'midi').toFrequency()
+      synth.triggerAttackRelease(freq, durSeconds * 0.8)
+    }
+
+    eventIndex++
+    nextNoteTime += durSeconds * 1000
+
+    // Schedule the next note at the precise time
+    const now = performance.now()
+    const delay = Math.max(0, nextNoteTime - now)
+    setTimeout(playNextNote, delay)
+  }
+
+  playNextNote()
 }
 
 function stopPreview() {
   isPlaying.value = false
   currentPlayingIndex.value = -1
+
   if (synth) {
     synth.dispose()
     synth = null
@@ -505,10 +543,5 @@ function stopPreview() {
     clickSynth.dispose()
     clickSynth = null
   }
-  if (clickLoop) {
-    clickLoop.dispose()
-    clickLoop = null
-  }
-  Tone.Transport.stop()
 }
 </script>
