@@ -540,22 +540,86 @@ async function playPreview() {
     if (useSamples.value) {
       console.log('Using samples mode')
       // Create multiple sample players for smoother playback (round-robin)
-      const numPlayers = 4 // Create 4 instances of each sample
+      const numPlayers = 6 // Increase to 6 instances for production stability
       
       topSamplePlayers = []
       chugSamplePlayers = []
       
+      // Create players with explicit loading and error handling
+      const createPlayersPromises = []
+      
       for (let i = 0; i < numPlayers; i++) {
-        topSamplePlayers.push(new Tone.Player(SAMPLE_PATHS.top).toDestination())
-        chugSamplePlayers.push(new Tone.Player(SAMPLE_PATHS.chug).toDestination())
+        const topPlayer = new Tone.Player({
+          url: SAMPLE_PATHS.top,
+          onload: () => console.log(`Top player ${i} loaded`),
+          onerror: (error) => console.error(`Top player ${i} error:`, error)
+        }).toDestination()
+        
+        const chugPlayer = new Tone.Player({
+          url: SAMPLE_PATHS.chug,
+          onload: () => console.log(`Chug player ${i} loaded`),
+          onerror: (error) => console.error(`Chug player ${i} error:`, error)
+        }).toDestination()
+        
+        topSamplePlayers.push(topPlayer)
+        chugSamplePlayers.push(chugPlayer)
+        
+        // Add individual loading promises
+        createPlayersPromises.push(
+          new Promise(resolve => {
+            if (topPlayer.loaded) {
+              resolve(`top-${i}`)
+            } else {
+              topPlayer.load(SAMPLE_PATHS.top).then(() => resolve(`top-${i}`))
+            }
+          })
+        )
+        createPlayersPromises.push(
+          new Promise(resolve => {
+            if (chugPlayer.loaded) {
+              resolve(`chug-${i}`)
+            } else {
+              chugPlayer.load(SAMPLE_PATHS.chug).then(() => resolve(`chug-${i}`))
+            }
+          })
+        )
       }
       
-      stackSamplePlayer = new Tone.Player(SAMPLE_PATHS.stack).toDestination()
-      snareSamplePlayer = new Tone.Player(SAMPLE_PATHS.snare).toDestination()
+      stackSamplePlayer = new Tone.Player({
+        url: SAMPLE_PATHS.stack,
+        onload: () => console.log('Stack player loaded'),
+        onerror: (error) => console.error('Stack player error:', error)
+      }).toDestination()
+      
+      snareSamplePlayer = new Tone.Player({
+        url: SAMPLE_PATHS.snare,
+        onload: () => console.log('Snare player loaded'),
+        onerror: (error) => console.error('Snare player error:', error)
+      }).toDestination()
 
-      // Wait for all samples to load
-      await Tone.loaded()
-      console.log('All samples loaded')
+      // Wait for ALL samples to load with timeout
+      console.log('Waiting for all samples to load...')
+      try {
+        await Promise.race([
+          Promise.all([
+            ...createPlayersPromises,
+            stackSamplePlayer.load(SAMPLE_PATHS.stack),
+            snareSamplePlayer.load(SAMPLE_PATHS.snare)
+          ]),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Sample loading timeout')), 10000)
+          )
+        ])
+        console.log('All samples loaded successfully')
+        
+        // Add a small delay to ensure everything is ready
+        await new Promise(resolve => setTimeout(resolve, 100))
+      } catch (error) {
+        console.error('Sample loading failed:', error)
+        alert('Failed to load audio samples. Using MIDI fallback.')
+        useSamples.value = false
+        return playPreview() // Retry with MIDI
+      }
     } else {
       console.log('Using MIDI synths mode')
       // Create MIDI synths
@@ -652,13 +716,17 @@ async function playPreview() {
         if (isFirstNoteOfCycle) {
           const player = topSamplePlayers[topPlayerIndex]
           if (player && player.loaded) {
-            player.start('+0', 0, durSeconds)
+            // Add slight scheduling offset for production stability
+            const scheduleTime = '+0.01' // 10ms offset
+            player.start(scheduleTime, 0, durSeconds)
           }
           topPlayerIndex = (topPlayerIndex + 1) % topSamplePlayers.length
         } else {
           const player = chugSamplePlayers[chugPlayerIndex]
           if (player && player.loaded) {
-            player.start('+0', 0, durSeconds)
+            // Add slight scheduling offset for production stability
+            const scheduleTime = '+0.01' // 10ms offset
+            player.start(scheduleTime, 0, durSeconds)
           }
           chugPlayerIndex = (chugPlayerIndex + 1) % chugSamplePlayers.length
         }
