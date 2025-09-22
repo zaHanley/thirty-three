@@ -10,21 +10,35 @@
         <h3 class="font-bold text-lg mb-2">Enable Audio</h3>
         <p class="text-sm text-base-content opacity-75 mb-4">
           <span v-if="isIOS()">
-            iOS requires user interaction to enable audio. Please tap the button below and ensure your device is not in silent mode.
+            iOS requires user interaction to enable audio. Please tap the button below and ensure
+            your device is not in silent mode.
           </span>
           <span v-else>
-            Mobile browsers require user interaction to enable audio. Tap the button below to unlock audio playback.
+            Mobile browsers require user interaction to enable audio. Tap the button below to unlock
+            audio playback.
           </span>
         </p>
-        <button @click="unlockAudio" class="btn btn-primary btn-wide mb-2">
-          <span v-if="isIOS()">� Enable iOS Audio</span>
-          <span v-else>�🎵 Enable Audio</span>
-        </button>
-        <p class="text-xs text-base-content opacity-50">
+        <div class="space-y-3">
+          <button @click="unlockAudio" class="btn btn-primary btn-wide">
+            <span v-if="isIOS()">🍎 Enable iOS Audio</span>
+            <span v-else>🎵 Enable Audio</span>
+          </button>
+
+          <!-- Force unlock button for stubborn iOS devices -->
+          <button @click="forceUnlockAudio" class="btn btn-secondary btn-wide">
+            <span v-if="isIOS()">🔧 Force iOS Unlock</span>
+            <span v-else>🔧 Force Audio Unlock</span>
+          </button>
+
+          <button @click="debugAudioState" class="btn btn-outline btn-sm">🔍 Debug Info</button>
+        </div>
+
+        <p class="text-xs text-base-content opacity-50 mt-3">
           This only needs to be done once per session
         </p>
         <p v-if="isIOS()" class="text-xs text-orange-600 mt-2">
-          💡 If audio still doesn't work, check that your device is not in silent mode
+          💡 If audio still doesn't work, try Force Unlock or check that your device is not in
+          silent mode
         </p>
       </div>
     </div>
@@ -147,26 +161,46 @@
           <!-- Mobile-friendly controls section -->
           <div class="space-y-3">
             <!-- Mobile: Stack all controls vertically -->
-            <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">            <!-- Audio status indicator (for debugging) -->
-            <div
-              v-if="isMobileDevice() || isIOS()"
-              class="text-xs px-2 py-1 rounded whitespace-nowrap"
-              :class="
-                audioUnlocked ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-              "
-            >
-              <span v-if="isIOS()">🍎 </span>{{ audioUnlocked ? '🔊 Audio Ready' : '🔇 Audio Locked' }}
-            </div>
+            <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+              <!-- Audio status indicator (for debugging) -->
+              <div
+                v-if="isMobileDevice() || isIOS()"
+                class="text-xs px-2 py-1 rounded whitespace-nowrap"
+                :class="
+                  audioUnlocked ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                "
+              >
+                <span v-if="isIOS()">🍎 </span
+                >{{ audioUnlocked ? '🔊 Audio Ready' : '🔇 Audio Locked' }}
+              </div>
 
-            <!-- Manual audio unlock button for testing -->
-            <button
-              v-if="(isMobileDevice() || isIOS()) && !audioUnlocked"
-              @click="showAudioUnlock = true"
-              class="btn btn-xs btn-warning whitespace-nowrap"
-            >
-              <span v-if="isIOS()">🍎 Unlock iOS Audio</span>
-              <span v-else">🔓 Unlock Audio</span>
-            </button>
+              <!-- Manual audio unlock button for testing -->
+              <button
+                v-if="(isMobileDevice() || isIOS()) && !audioUnlocked"
+                @click="showAudioUnlock = true"
+                class="btn btn-xs btn-warning whitespace-nowrap"
+              >
+                <span v-if="isIOS()">🍎 Unlock iOS Audio</span>
+                <span v-else>🔓 Unlock Audio</span>
+              </button>
+
+              <!-- Force unlock button for stubborn devices -->
+              <button
+                v-if="(isMobileDevice() || isIOS()) && !audioUnlocked"
+                @click="forceUnlockAudio"
+                class="btn btn-xs bg-orange-600 text-white whitespace-nowrap"
+              >
+                🔧 Force Unlock
+              </button>
+
+              <!-- Debug button -->
+              <button
+                v-if="isIOS() || isMobileDevice()"
+                @click="debugAudioState"
+                class="btn btn-xs btn-outline whitespace-nowrap"
+              >
+                🔍 Debug
+              </button>
 
               <!-- Audio mode toggle -->
               <div class="form-control">
@@ -191,7 +225,7 @@
                 class="btn btn-sm btn-primary text-primary-content rounded flex-1 sm:flex-none"
               >
                 <span v-if="isGenerating" class="animate-pulse text-center block"
-                  >Be patient, you can't even count this high</span
+                  >Generating ...</span
                 >
                 <span v-else>Generate</span>
               </button>
@@ -609,9 +643,8 @@ async function playPreview() {
   if (!midiEvents.value.length || !selectedGrouping.value) return
 
   // Enhanced iOS/mobile audio check
-  const needsUnlock = (isMobileDevice() || isIOS()) &&
-                     !audioUnlocked.value &&
-                     Tone.context.state !== 'running'
+  const needsUnlock =
+    (isMobileDevice() || isIOS()) && !audioUnlocked.value && Tone.context.state !== 'running'
 
   if (needsUnlock) {
     console.log('🔒 Audio not unlocked on iOS/mobile, showing unlock modal')
@@ -620,7 +653,7 @@ async function playPreview() {
       isSafari: isSafari(),
       isMobile: isMobileDevice(),
       contextState: Tone.context.state,
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent,
     })
     showAudioUnlock.value = true
     return
@@ -958,8 +991,10 @@ function isMobileDevice() {
 }
 
 function isIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) // iPad on iOS 13+
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  ) // iPad on iOS 13+
 }
 
 function isSafari() {
@@ -968,88 +1003,333 @@ function isSafari() {
 
 async function unlockAudio() {
   try {
-    console.log('Attempting to unlock audio on iOS/mobile...')
-    console.log('Current audio context state:', Tone.context.state)
+    console.log('🔓 Attempting to unlock audio on iOS/mobile...')
+    console.log('📊 Initial audio context state:', Tone.context.state)
 
-    // Multiple strategies for iOS audio unlock
+    // Strategy 1: Native Web Audio API unlock (most aggressive for iOS)
+    const audioContext = Tone.context.rawContext || Tone.context
+    console.log('🎵 Using audio context:', audioContext.constructor.name)
 
-    // Strategy 1: Start Tone.js context
+    // Extra strategy for iOS: Try HTML5 Audio first
+    if (isIOS()) {
+      console.log('🍎 Trying HTML5 Audio unlock for iOS...')
+      try {
+        const audio = new Audio()
+        audio.src =
+          'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
+        console.log('✅ HTML5 Audio unlock attempted')
+      } catch (htmlAudioError) {
+        console.warn('⚠️ HTML5 Audio unlock failed:', htmlAudioError)
+      }
+    }
+
+    if (audioContext.state === 'suspended') {
+      console.log('🔄 Resuming suspended audio context...')
+      await audioContext.resume()
+      console.log('✅ Audio context resumed, state:', audioContext.state)
+    }
+
+    // Strategy 2: Create and play a native audio buffer to fully unlock iOS
+    console.log('🎯 Creating native audio buffer for iOS unlock...')
+    const buffer = audioContext.createBuffer(1, 44100 * 0.1, 44100) // 100ms buffer
+    const source = audioContext.createBufferSource()
+    const gainNode = audioContext.createGain()
+
+    // Fill buffer with a very quiet sine wave
+    const channelData = buffer.getChannelData(0)
+    for (let i = 0; i < channelData.length; i++) {
+      channelData[i] = Math.sin((2 * Math.PI * 440 * i) / 44100) * 0.01 // Very quiet 440Hz
+    }
+
+    source.buffer = buffer
+    gainNode.gain.value = 0.1 // Even quieter
+    source.connect(gainNode)
+    gainNode.connect(audioContext.destination as AudioDestinationNode)
+
+    source.start(0)
+    source.stop(audioContext.currentTime + 0.1)
+
+    console.log('🎵 Native audio buffer played for iOS unlock')
+
+    // Strategy 3: Start Tone.js context after native unlock
     await Tone.start()
-    console.log('Tone.js context state after start:', Tone.context.state)
+    console.log('🎹 Tone.js started, context state:', Tone.context.state)
 
-    // Strategy 2: For iOS, we need to actually play and immediately stop real audio
-    // Create a very brief silent audio to fully unlock the context
-    const unlockBuffer = Tone.context.createBuffer(1, 1, 22050)
-    const unlockSource = Tone.context.createBufferSource()
-    unlockSource.buffer = unlockBuffer
-    unlockSource.connect(Tone.context.rawContext.destination)
-    unlockSource.start(0)
-
-    // Strategy 3: Test with a real oscillator that iOS can hear
+    // Strategy 4: Test with Tone.js oscillator
     if (Tone.context.state === 'running') {
-      console.log('Testing audio with oscillator...')
-      const testSynth = new Tone.Oscillator(440, 'sine').toDestination()
-      testSynth.volume.value = -30 // Slightly louder for iOS
-      testSynth.start()
-      testSynth.stop('+0.1') // Play for 100ms so iOS registers it
+      console.log('🧪 Testing with Tone.js oscillator...')
+      const testOsc = new Tone.Oscillator(440, 'sine').toDestination()
+      testOsc.volume.value = -20 // Audible but not too loud
+      testOsc.start()
+      testOsc.stop('+0.2') // Play for 200ms
 
-      // Give iOS time to process the audio
-      await new Promise(resolve => setTimeout(resolve, 200))
+      // Wait for the test to complete
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      testOsc.dispose()
+      console.log('✅ Tone.js oscillator test completed')
 
-      testSynth.dispose()
-
-      // Strategy 4: Test sample loading on iOS
-      if (useSamples.value) {
-        console.log('Pre-loading a sample for iOS...')
+      // Strategy 5: For iOS with samples, do a quick sample test
+      if (isIOS() && useSamples.value) {
+        console.log('🍎 Testing sample loading on iOS...')
         try {
-          const testPlayer = new Tone.Player('/samples/top.mp3').toDestination()
+          const testPlayer = new Tone.Player().toDestination()
           await testPlayer.load('/samples/top.mp3')
-          testPlayer.volume.value = -50
+          testPlayer.volume.value = -40
           testPlayer.start()
-          testPlayer.stop('+0.05')
+          testPlayer.stop('+0.1')
 
-          setTimeout(() => testPlayer.dispose(), 300)
-          console.log('Sample test completed on iOS')
+          setTimeout(() => {
+            testPlayer.dispose()
+            console.log('✅ iOS sample test completed')
+          }, 200)
         } catch (sampleError) {
-          console.warn('Sample test failed on iOS:', sampleError)
+          console.warn('⚠️ iOS sample test failed, will use MIDI fallback:', sampleError)
         }
       }
 
       audioUnlocked.value = true
       showAudioUnlock.value = false
-
-      console.log('✅ Audio unlock completed successfully for iOS')
+      console.log('🎉 Audio unlock completed successfully!')
     } else {
-      throw new Error(`Audio context state is ${Tone.context.state}, not running`)
+      throw new Error(`❌ Audio context state is still ${Tone.context.state} after unlock attempts`)
     }
   } catch (error) {
-    console.error('❌ Failed to unlock audio:', error)
-    console.log('Will try alternative unlock method...')
+    console.error('❌ Primary unlock method failed:', error)
 
-    // Alternative method: Force resume the audio context
+    // Last resort: Force everything and hope for the best
     try {
-      if (Tone.context.state === 'suspended') {
-        await Tone.context.resume()
-        console.log('Audio context resumed, state now:', Tone.context.state)
+      console.log('🚨 Trying last resort unlock method...')
+
+      // Force resume any suspended contexts
+      const contexts = [Tone.context.rawContext, Tone.context]
+      for (const ctx of contexts) {
+        if (ctx && ctx.state === 'suspended') {
+          await ctx.resume()
+          console.log('🔄 Force resumed context:', ctx.constructor.name)
+        }
       }
 
-      // Mark as unlocked even if tests failed - let user try playing
+      // Mark as unlocked regardless - let the user try
       audioUnlocked.value = true
       showAudioUnlock.value = false
-    } catch (resumeError) {
-      console.error('Resume also failed:', resumeError)
+      console.log('🤞 Marked as unlocked, user can try playing audio')
+    } catch (finalError) {
+      console.error('💥 All unlock methods failed:', finalError)
       showAudioUnlock.value = false
     }
   }
+}
+
+// Force unlock function - even more aggressive iOS audio unlock
+async function forceUnlockAudio() {
+  try {
+    console.log('🚨 FORCE UNLOCK: Starting extremely aggressive iOS audio unlock...')
+
+    // Method 1: Multiple HTML5 audio elements with different approaches
+    console.log('📱 Trying multiple HTML5 audio unlock strategies...')
+    const formats = [
+      'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ4AAACB',
+      'data:audio/mpeg;base64,//MkxAAHiAJjgBwAAFgGDbcILGCDUiCDUjUiEGdQ==',
+      '', // Empty source
+    ]
+
+    for (const format of formats) {
+      try {
+        const audio = new Audio()
+        if (format) audio.src = format
+        audio.volume = 0.001
+        audio.loop = false
+        audio.muted = false
+        audio.preload = 'auto'
+
+        const playPromise = audio.play()
+        if (playPromise) {
+          await playPromise.catch(() => {})
+        }
+
+        setTimeout(() => {
+          audio.pause()
+          audio.currentTime = 0
+        }, 50)
+
+        console.log('✅ Force unlock: HTML5 audio attempt succeeded')
+      } catch (audioError) {
+        console.warn('⚠️ Force unlock: HTML5 audio failed:', audioError)
+      }
+    }
+
+    // Method 2: Create fresh AudioContext and test multiple frequencies
+    console.log('🔊 Creating fresh AudioContext for force unlock...')
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+      const forceContext = new AudioContext()
+
+      if (forceContext.state === 'suspended') {
+        await forceContext.resume()
+      }
+
+      // Test multiple frequencies simultaneously
+      const frequencies = [220, 440, 880]
+      for (const freq of frequencies) {
+        const osc = forceContext.createOscillator()
+        const gain = forceContext.createGain()
+
+        osc.frequency.setValueAtTime(freq, forceContext.currentTime)
+        osc.type = 'sine'
+        gain.gain.setValueAtTime(0.005, forceContext.currentTime)
+
+        osc.connect(gain)
+        gain.connect(forceContext.destination)
+
+        osc.start(forceContext.currentTime)
+        osc.stop(forceContext.currentTime + 0.1)
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      await forceContext.close()
+      console.log('✅ Force unlock: Fresh AudioContext test completed')
+    } catch (webAudioError) {
+      console.warn('⚠️ Force unlock: Fresh AudioContext failed:', webAudioError)
+    }
+
+    // Method 3: Force Tone.js restart
+    console.log('🎹 Force restarting Tone.js...')
+    try {
+      // Try to dispose current context
+      try {
+        if (Tone.context && Tone.context.rawContext) {
+          const rawContext = Tone.context.rawContext as any
+          if (rawContext.close) {
+            await rawContext.close()
+          }
+        }
+      } catch (closeError) {
+        console.warn('⚠️ Could not close context:', closeError)
+      }
+
+      // Force restart
+      await Tone.start()
+      console.log('✅ Tone.js force restart completed, state:', Tone.context.state)
+
+      // Test with multiple Tone.js instruments
+      if (Tone.context.state === 'running') {
+        const testOsc = new Tone.Oscillator(440, 'triangle').toDestination()
+        testOsc.volume.value = -40
+        testOsc.start()
+        testOsc.stop('+0.05')
+
+        setTimeout(() => testOsc.dispose(), 100)
+        console.log('✅ Force unlock: Tone.js test succeeded')
+      }
+    } catch (toneError) {
+      console.warn('⚠️ Force unlock: Tone.js restart failed:', toneError)
+    }
+
+    // Method 4: Canvas and touch event simulation
+    console.log('🖱️ Simulating additional user interactions...')
+    try {
+      // Create multiple touch/click events
+      const events = ['touchstart', 'touchend', 'mousedown', 'mouseup', 'click']
+      for (const eventType of events) {
+        const event = new Event(eventType, { bubbles: true })
+        document.dispatchEvent(event)
+      }
+
+      // Canvas interaction
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        canvas.width = 1
+        canvas.height = 1
+        ctx.fillRect(0, 0, 1, 1)
+      }
+
+      console.log('✅ Force unlock: User interaction simulation completed')
+    } catch (interactionError) {
+      console.warn('⚠️ Force unlock: Interaction simulation failed:', interactionError)
+    }
+
+    // Wait for everything to settle
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Mark as unlocked regardless
+    audioUnlocked.value = true
+    showAudioUnlock.value = false
+
+    console.log('🎉 FORCE UNLOCK COMPLETED! Audio context state:', Tone.context.state)
+
+    // Show result to user
+    const contextState = Tone.context.state
+    const message =
+      contextState === 'running'
+        ? 'Force unlock succeeded! Audio should work now.'
+        : `Force unlock completed. Context is ${contextState}. Try playing audio - it may still work.`
+
+    alert(message)
+  } catch (error) {
+    console.error('💥 Force unlock failed:', error)
+
+    // Ultimate fallback
+    audioUnlocked.value = true
+    showAudioUnlock.value = false
+    alert('Force unlock had errors, but audio may still work. Try playing something!')
+  }
+}
+
+// Debug function for iOS audio troubleshooting
+function debugAudioState() {
+  console.log('🔍 iOS AUDIO DEBUG INFO:')
+  console.log('📱 Device Detection:', {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    maxTouchPoints: navigator.maxTouchPoints,
+    isIOS: isIOS(),
+    isSafari: isSafari(),
+    isMobile: isMobileDevice(),
+  })
+
+  console.log('🎵 Audio Context Info:', {
+    toneContextState: Tone.context.state,
+    rawContextState: Tone.context.rawContext?.state,
+    contextConstructor: Tone.context.constructor.name,
+    rawContextConstructor: Tone.context.rawContext?.constructor.name,
+    sampleRate: Tone.context.sampleRate,
+    currentTime: Tone.context.currentTime,
+  })
+
+  console.log('🔧 App State:', {
+    audioUnlocked: audioUnlocked.value,
+    useSamples: useSamples.value,
+    isPlaying: isPlaying.value,
+    showAudioUnlock: showAudioUnlock.value,
+  })
+
+  // Test if we can create audio nodes
+  try {
+    const testOsc = Tone.context.createOscillator()
+    console.log('✅ Can create oscillator:', !!testOsc)
+    testOsc.disconnect()
+  } catch (e) {
+    console.error('❌ Cannot create oscillator:', e)
+  }
+
+  // Alert the user with key info
+  alert(`iOS Debug Info:
+Device: ${isIOS() ? 'iOS' : 'Not iOS'}
+Browser: ${isSafari() ? 'Safari' : 'Other'}
+Audio Context: ${Tone.context.state}
+Raw Context: ${Tone.context.rawContext?.state || 'N/A'}
+Audio Unlocked: ${audioUnlocked.value}
+
+Check console for detailed info.`)
 }
 
 // Check if we need to show audio unlock on mobile
 function checkAudioUnlockNeeded() {
   const isMobile = isMobileDevice()
   const isiOS = isIOS()
-  const needsUnlock = (isMobile || isiOS) &&
-                     !audioUnlocked.value &&
-                     Tone.context.state !== 'running'
+  const needsUnlock =
+    (isMobile || isiOS) && !audioUnlocked.value && Tone.context.state !== 'running'
 
   if (needsUnlock) {
     console.log('🔒 Mobile/iOS device detected with locked audio context, showing unlock modal')
@@ -1061,7 +1341,7 @@ function checkAudioUnlockNeeded() {
       isIOS: isiOS,
       isSafari: isSafari(),
       toneState: Tone.context.state,
-      platform: navigator.platform
+      platform: navigator.platform,
     })
     showAudioUnlock.value = true
   } else {
@@ -1069,7 +1349,7 @@ function checkAudioUnlockNeeded() {
       isMobile: isMobile,
       isIOS: isiOS,
       audioUnlocked: audioUnlocked.value,
-      toneState: Tone.context.state
+      toneState: Tone.context.state,
     })
   }
 }
