@@ -94,6 +94,18 @@
           </div>
 
           <div class="flex gap-2 items-center">
+            <!-- Audio mode toggle -->
+            <div class="form-control">
+              <label class="label cursor-pointer gap-2">
+                <span class="label-text text-xs">Samples</span>
+                <input
+                  type="checkbox"
+                  v-model="useSamples"
+                  class="toggle toggle-xs toggle-primary"
+                />
+              </label>
+            </div>
+
             <button
               @click="generateGroupings"
               :disabled="isGenerating"
@@ -236,11 +248,18 @@ const midiEvents = ref<{ pitch: number; duration: number }[]>([])
 const isPlaying = ref(false)
 const isControlsExpanded = ref(true)
 const currentPlayingIndex = ref(-1)
+const useSamples = ref(true) // Toggle between samples and MIDI tones
 // Sample players for your MP3 files
 let topSamplePlayer: Tone.Player | null = null     // For first note of cycle
 let chugSamplePlayer: Tone.Player | null = null    // For other notes
 let stackSamplePlayer: Tone.Player | null = null   // For metronome clicks
 let snareSamplePlayer: Tone.Player | null = null   // For snare on beat 3
+
+// MIDI synths for tone generation
+let synth: Tone.PolySynth | null = null
+let clickSynth: Tone.MetalSynth | null = null
+let snareSynth: Tone.NoiseSynth | null = null
+
 let clickLoop: Tone.Loop | null = null
 
 // Timeout IDs for proper cleanup
@@ -501,107 +520,147 @@ function downloadMIDI() {
 async function playPreview() {
   if (!midiEvents.value.length || !selectedGrouping.value) return
 
-  await Tone.start()
-  stopPreview()
+  try {
+    await Tone.start()
+    console.log('Tone.js started successfully')
+    stopPreview()
 
-  isPlaying.value = true
-  currentPlayingIndex.value = 0
+    isPlaying.value = true
+    currentPlayingIndex.value = 0
 
-  // Create sample players for your MP3 files
-  topSamplePlayer = new Tone.Player(SAMPLE_PATHS.top).toDestination()
-  chugSamplePlayer = new Tone.Player(SAMPLE_PATHS.chug).toDestination()
-  stackSamplePlayer = new Tone.Player(SAMPLE_PATHS.stack).toDestination()
-  snareSamplePlayer = new Tone.Player(SAMPLE_PATHS.snare).toDestination()
+    if (useSamples.value) {
+      console.log('Using samples mode')
+      // Create sample players for your MP3 files
+      topSamplePlayer = new Tone.Player(SAMPLE_PATHS.top).toDestination()
+      chugSamplePlayer = new Tone.Player(SAMPLE_PATHS.chug).toDestination()
+      stackSamplePlayer = new Tone.Player(SAMPLE_PATHS.stack).toDestination()
+      snareSamplePlayer = new Tone.Player(SAMPLE_PATHS.snare).toDestination()
 
-  // Wait for all samples to load
-  await Tone.loaded()
-
-  // Start both the metronome and main playbook at exactly the same time
-  const startTime = performance.now()
-  const beatDuration = (60 / tempo.value) * 1000 // Convert to milliseconds
-
-  // Metronome that stays in sync using stack.mp3
-  function scheduleNextClick(nextClickTime: number) {
-    if (!isPlaying.value) return
-
-    const now = performance.now()
-    const delay = Math.max(0, nextClickTime - now)
-
-    clickTimeoutId = window.setTimeout(() => {
-      if (!isPlaying.value) return
-      if (stackSamplePlayer && stackSamplePlayer.loaded) {
-        // Stop any previous playback and start fresh
-        stackSamplePlayer.stop()
-        stackSamplePlayer.start()
-      }
-      scheduleNextClick(nextClickTime + beatDuration)
-    }, delay)
-  }
-
-  // Snare on beat 3 of each measure (assuming 4/4 time) using snare.mp3
-  function scheduleNextSnare(nextSnareTime: number) {
-    if (!isPlaying.value) return
-
-    const now = performance.now()
-    const delay = Math.max(0, nextSnareTime - now)
-
-    snareTimeoutId = window.setTimeout(() => {
-      if (!isPlaying.value) return
-      if (snareSamplePlayer && snareSamplePlayer.loaded) {
-        // Stop any previous playback and start fresh
-        snareSamplePlayer.stop()
-        snareSamplePlayer.start()
-      }
-      // Next snare is 4 beats later (one measure)
-      scheduleNextSnare(nextSnareTime + beatDuration * 4)
-    }, delay)
-  }
-
-  // Start the first click
-  scheduleNextClick(startTime)
-
-  // Start the first snare on beat 3 (2 beats after start)
-  scheduleNextSnare(startTime + beatDuration * 2)
-
-  const groupingLength = selectedGrouping.value.length
-  let eventIndex = 0
-  let nextNoteTime = startTime
-
-  function playNextNote() {
-    if (!isPlaying.value) return
-
-    // If we've reached the end, loop back to the beginning
-    if (eventIndex >= midiEvents.value.length) {
-      eventIndex = 0
+      // Wait for all samples to load
+      await Tone.loaded()
+      console.log('All samples loaded')
+    } else {
+      console.log('Using MIDI synths mode')
+      // Create MIDI synths
+      synth = new Tone.PolySynth().toDestination()
+      clickSynth = new Tone.MetalSynth().toDestination()
+      snareSynth = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 },
+      }).toDestination()
+      console.log('MIDI synths created')
     }
 
-    const event = midiEvents.value[eventIndex]
-    const durSeconds = event.duration * (60 / tempo.value / 4)
+    // Start both the metronome and main playback at exactly the same time
+    const startTime = performance.now()
+    const beatDuration = (60 / tempo.value) * 1000 // Convert to milliseconds
 
-    // Update visual highlighting
-    currentPlayingIndex.value = eventIndex % groupingLength
+    // Metronome that stays in sync
+    const scheduleNextClick = (nextClickTime: number) => {
+      if (!isPlaying.value) return
 
-    // Play the appropriate sample - top.mp3 for first note of cycle, chug.mp3 for others
-    const isFirstNoteOfCycle = (eventIndex % groupingLength) === 0
-    const samplePlayer = isFirstNoteOfCycle ? topSamplePlayer : chugSamplePlayer
-    
-    if (samplePlayer && samplePlayer.loaded) {
-      // Stop any previous playback and start fresh with exact duration
-      samplePlayer.stop()
-      samplePlayer.start('+0', 0, durSeconds)
+      const now = performance.now()
+      const delay = Math.max(0, nextClickTime - now)
+
+      clickTimeoutId = window.setTimeout(() => {
+        if (!isPlaying.value) return
+        
+        if (useSamples.value) {
+          if (stackSamplePlayer && stackSamplePlayer.loaded) {
+            stackSamplePlayer.stop()
+            stackSamplePlayer.start()
+          }
+        } else {
+          if (clickSynth) {
+            clickSynth.triggerAttackRelease('C-2', '32n', '+0', 0.1)
+          }
+        }
+        scheduleNextClick(nextClickTime + beatDuration)
+      }, delay)
     }
 
-    eventIndex++
-    nextNoteTime += durSeconds * 1000
+    // Snare on beat 3 of each measure (assuming 4/4 time)
+    const scheduleNextSnare = (nextSnareTime: number) => {
+      if (!isPlaying.value) return
 
-    // Schedule the next note at the precise time
-    const now = performance.now()
-    const delay = Math.max(0, nextNoteTime - now)
-    const timeoutId = window.setTimeout(playNextNote, delay)
-    activeTimeouts.push(timeoutId)
+      const now = performance.now()
+      const delay = Math.max(0, nextSnareTime - now)
+
+      snareTimeoutId = window.setTimeout(() => {
+        if (!isPlaying.value) return
+        
+        if (useSamples.value) {
+          if (snareSamplePlayer && snareSamplePlayer.loaded) {
+            snareSamplePlayer.stop()
+            snareSamplePlayer.start()
+          }
+        } else {
+          if (snareSynth) {
+            snareSynth.triggerAttackRelease('32n', '+0', 0.3)
+          }
+        }
+        // Next snare is 4 beats later (one measure)
+        scheduleNextSnare(nextSnareTime + beatDuration * 4)
+      }, delay)
+    }
+
+    // Start the first click
+    scheduleNextClick(startTime)
+
+    // Start the first snare on beat 3 (2 beats after start)
+    scheduleNextSnare(startTime + beatDuration * 2)
+
+    const groupingLength = selectedGrouping.value.length
+    let eventIndex = 0
+    let nextNoteTime = startTime
+
+    const playNextNote = () => {
+      if (!isPlaying.value) return
+
+      // If we've reached the end, loop back to the beginning
+      if (eventIndex >= midiEvents.value.length) {
+        eventIndex = 0
+      }
+
+      const event = midiEvents.value[eventIndex]
+      const durSeconds = event.duration * (60 / tempo.value / 4)
+
+      // Update visual highlighting
+      currentPlayingIndex.value = eventIndex % groupingLength
+
+      if (useSamples.value) {
+        // Play the appropriate sample - top.mp3 for first note of cycle, chug.mp3 for others
+        const isFirstNoteOfCycle = (eventIndex % groupingLength) === 0
+        const samplePlayer = isFirstNoteOfCycle ? topSamplePlayer : chugSamplePlayer
+        
+        if (samplePlayer && samplePlayer.loaded) {
+          // Stop any previous playback and start fresh with exact duration
+          samplePlayer.stop()
+          samplePlayer.start('+0', 0, durSeconds)
+        }
+      } else {
+        // Play MIDI tone
+        if (synth) {
+          const freq = Tone.Frequency(event.pitch, 'midi').toFrequency()
+          synth.triggerAttackRelease(freq, durSeconds * 0.8)
+        }
+      }
+
+      eventIndex++
+      nextNoteTime += durSeconds * 1000
+
+      // Schedule the next note at the precise time
+      const now = performance.now()
+      const delay = Math.max(0, nextNoteTime - now)
+      const timeoutId = window.setTimeout(playNextNote, delay)
+      activeTimeouts.push(timeoutId)
+    }
+
+    playNextNote()
+  } catch (error) {
+    console.error('Error in playPreview:', error)
+    isPlaying.value = false
   }
-
-  playNextNote()
 }
 
 function stopPreview() {
@@ -622,7 +681,7 @@ function stopPreview() {
     snareTimeoutId = null
   }
 
-  // Stop and dispose all sample players
+  // Stop and dispose sample players
   if (topSamplePlayer) {
     topSamplePlayer.stop()
     topSamplePlayer.dispose()
@@ -642,6 +701,20 @@ function stopPreview() {
     snareSamplePlayer.stop()
     snareSamplePlayer.dispose()
     snareSamplePlayer = null
+  }
+
+  // Stop and dispose MIDI synths
+  if (synth) {
+    synth.dispose()
+    synth = null
+  }
+  if (clickSynth) {
+    clickSynth.dispose()
+    clickSynth = null
+  }
+  if (snareSynth) {
+    snareSynth.dispose()
+    snareSynth = null
   }
 }
 </script>
