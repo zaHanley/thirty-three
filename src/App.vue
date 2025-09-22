@@ -373,12 +373,16 @@ const audioUnlocked = ref(false) // Track if audio has been unlocked
 // Sample players for your MP3 files - using multiple instances to avoid choppiness
 let topSamplePlayers: Tone.Player[] = []
 let chugSamplePlayers: Tone.Player[] = []
+let topBassSamplePlayers: Tone.Player[] = []
+let chugBassSamplePlayers: Tone.Player[] = []
 let stackSamplePlayer: Tone.Player | null = null
 let snareSamplePlayer: Tone.Player | null = null
 
 // Current player index for round-robin
 let topPlayerIndex = 0
 let chugPlayerIndex = 0
+let topBassPlayerIndex = 0
+let chugBassPlayerIndex = 0
 
 // MIDI synths for tone generation
 let synth: Tone.PolySynth | null = null
@@ -396,6 +400,8 @@ let snareTimeoutId: number | null = null
 const SAMPLE_PATHS = {
   top: '/samples/top.mp3', // First note of each cycle
   chug: '/samples/chug.mp3', // Rest of the notes
+  top_bass: '/samples/top_bass.mp3', // Bass layer for first note
+  chug_bass: '/samples/chug_bass.mp3', // Bass layer for rest of notes
   stack: '/samples/stack.mp3', // Quarter note metronome
   snare: '/samples/snare.mp3', // Snare on beat 3
 }
@@ -706,6 +712,8 @@ async function playPreview() {
 
       topSamplePlayers = []
       chugSamplePlayers = []
+      topBassSamplePlayers = []
+      chugBassSamplePlayers = []
 
       // Create players with explicit loading and error handling
       const createPlayersPromises = []
@@ -723,8 +731,22 @@ async function playPreview() {
           onerror: (error) => console.error(`Chug player ${i} error:`, error),
         }).toDestination()
 
+        const topBassPlayer = new Tone.Player({
+          url: SAMPLE_PATHS.top_bass,
+          onload: () => console.log(`Top bass player ${i} loaded`),
+          onerror: (error) => console.error(`Top bass player ${i} error:`, error),
+        }).toDestination()
+
+        const chugBassPlayer = new Tone.Player({
+          url: SAMPLE_PATHS.chug_bass,
+          onload: () => console.log(`Chug bass player ${i} loaded`),
+          onerror: (error) => console.error(`Chug bass player ${i} error:`, error),
+        }).toDestination()
+
         topSamplePlayers.push(topPlayer)
         chugSamplePlayers.push(chugPlayer)
+        topBassSamplePlayers.push(topBassPlayer)
+        chugBassSamplePlayers.push(chugBassPlayer)
 
         // Add individual loading promises
         createPlayersPromises.push(
@@ -742,6 +764,24 @@ async function playPreview() {
               resolve(`chug-${i}`)
             } else {
               chugPlayer.load(SAMPLE_PATHS.chug).then(() => resolve(`chug-${i}`))
+            }
+          }),
+        )
+        createPlayersPromises.push(
+          new Promise((resolve) => {
+            if (topBassPlayer.loaded) {
+              resolve(`top-bass-${i}`)
+            } else {
+              topBassPlayer.load(SAMPLE_PATHS.top_bass).then(() => resolve(`top-bass-${i}`))
+            }
+          }),
+        )
+        createPlayersPromises.push(
+          new Promise((resolve) => {
+            if (chugBassPlayer.loaded) {
+              resolve(`chug-bass-${i}`)
+            } else {
+              chugBassPlayer.load(SAMPLE_PATHS.chug_bass).then(() => resolve(`chug-bass-${i}`))
             }
           }),
         )
@@ -876,21 +916,41 @@ async function playPreview() {
         const isFirstNoteOfCycle = eventIndex % groupingLength === 0
 
         if (isFirstNoteOfCycle) {
+          // Play top sample
           const player = topSamplePlayers[topPlayerIndex]
           if (player && player.loaded) {
             // Add slight scheduling offset for production stability
             const scheduleTime = '+0.01' // 10ms offset
             player.start(scheduleTime, 0, durSeconds)
           }
+          
+          // Play top bass sample simultaneously
+          const bassPlayer = topBassSamplePlayers[topBassPlayerIndex]
+          if (bassPlayer && bassPlayer.loaded) {
+            const scheduleTime = '+0.01' // 10ms offset
+            bassPlayer.start(scheduleTime, 0, durSeconds)
+          }
+          
           topPlayerIndex = (topPlayerIndex + 1) % topSamplePlayers.length
+          topBassPlayerIndex = (topBassPlayerIndex + 1) % topBassSamplePlayers.length
         } else {
+          // Play chug sample
           const player = chugSamplePlayers[chugPlayerIndex]
           if (player && player.loaded) {
             // Add slight scheduling offset for production stability
             const scheduleTime = '+0.01' // 10ms offset
             player.start(scheduleTime, 0, durSeconds)
           }
+          
+          // Play chug bass sample simultaneously
+          const bassPlayer = chugBassSamplePlayers[chugBassPlayerIndex]
+          if (bassPlayer && bassPlayer.loaded) {
+            const scheduleTime = '+0.01' // 10ms offset
+            bassPlayer.start(scheduleTime, 0, durSeconds)
+          }
+          
           chugPlayerIndex = (chugPlayerIndex + 1) % chugSamplePlayers.length
+          chugBassPlayerIndex = (chugBassPlayerIndex + 1) % chugBassSamplePlayers.length
         }
       } else {
         // Play MIDI tone
@@ -953,6 +1013,24 @@ function stopPreview() {
   })
   chugSamplePlayers = []
   chugPlayerIndex = 0
+
+  topBassSamplePlayers.forEach((player) => {
+    if (player) {
+      player.stop()
+      player.dispose()
+    }
+  })
+  topBassSamplePlayers = []
+  topBassPlayerIndex = 0
+
+  chugBassSamplePlayers.forEach((player) => {
+    if (player) {
+      player.stop()
+      player.dispose()
+    }
+  })
+  chugBassSamplePlayers = []
+  chugBassPlayerIndex = 0
   if (stackSamplePlayer) {
     stackSamplePlayer.stop()
     stackSamplePlayer.dispose()
