@@ -5,33 +5,40 @@
 I've implemented several aggressive iOS audio unlock strategies to help with stubborn iOS devices that won't unlock audio:
 
 ### 1. Enhanced Audio Unlock Modal
+
 - **Force Unlock Button**: Added a secondary "Force iOS Unlock" button in the unlock modal
 - **Debug Button**: Added debug information button to see device and audio context details
 
 ### 2. Force Unlock Strategies
+
 The new `forceUnlockAudio()` function implements multiple aggressive strategies:
 
 #### Method 1: Multiple HTML5 Audio Formats
+
 - Tests WAV, MP3, and OGG data URLs
 - Uses different encoding approaches
 - Attempts multiple simultaneous unlock events
 
 #### Method 2: Fresh AudioContext Creation
+
 - Creates completely new WebAudio contexts
 - Tests multiple frequencies (220Hz, 440Hz, 880Hz) simultaneously
 - Forces context resume with native API calls
 
 #### Method 3: Tone.js Force Restart
+
 - Closes existing Tone.js context
 - Forces complete reinitialization
 - Tests with multiple instrument types (oscillator, metal synth, noise synth)
 
 #### Method 4: User Interaction Simulation
+
 - Dispatches multiple touch/click events
 - Creates canvas interactions
 - Attempts to satisfy iOS gesture requirements
 
 ### 3. Enhanced UI Controls
+
 - **Main UI**: Added Force Unlock and Debug buttons to the main interface
 - **Better Mobile Detection**: More comprehensive iOS/mobile device detection
 - **Status Indicators**: Clear visual feedback about audio state
@@ -53,7 +60,9 @@ The new `forceUnlockAudio()` function implements multiple aggressive strategies:
    - Check that your device is not in silent mode
 
 ### Debug Information Provided:
+
 The debug function now shows:
+
 - Device detection details (iOS, Safari, mobile)
 - Audio context states (Tone.js and raw WebAudio)
 - App state information
@@ -63,15 +72,18 @@ The debug function now shows:
 ### Expected Behavior:
 
 #### Success Cases:
+
 - Audio context state should be "running"
 - You should hear audio when playing patterns
 - Green "Audio Ready" indicator should show
 
 #### Partial Success:
+
 - Context may show "suspended" but audio might still work
 - Try playing anyway as iOS sometimes works despite showing suspended
 
 #### Failure Cases:
+
 - If multiple force unlock attempts fail, the device may have:
   - Hardware restrictions (silent mode switch)
   - iOS version limitations
@@ -80,6 +92,7 @@ The debug function now shows:
 ## Technical Details
 
 ### Multiple Unlock Strategies:
+
 1. **HTML5 Audio**: Uses data URLs with different audio formats
 2. **WebAudio Buffer**: Creates and plays audio buffers directly
 3. **Multiple Frequencies**: Tests various audio frequencies
@@ -88,7 +101,9 @@ The debug function now shows:
 6. **Canvas Interaction**: Additional iOS permission bypass
 
 ### Logging:
+
 All unlock attempts are logged to the console with emoji prefixes:
+
 - 🚨 Force unlock start
 - ✅ Successful steps
 - ⚠️ Warnings/failures

@@ -3,6 +3,7 @@
 ## What's Been Added
 
 ### 1. Force Unlock Function (`forceUnlockAudio`)
+
 - **Location**: Added to `/Users/zack/Projects/thirty-three/src/App.vue`
 - **Purpose**: More aggressive iOS audio unlock when standard method fails
 - **Strategies**:
@@ -13,11 +14,13 @@
   - Canvas interaction for additional permission triggers
 
 ### 2. Enhanced UI Elements
+
 - **Force Unlock Button**: Added to both unlock modal and main UI
 - **Debug Button**: Shows detailed iOS/audio context information
 - **Status Indicators**: Better visual feedback about audio state
 
 ### 3. Improved Debug Function (`debugAudioState`)
+
 - **Device Detection**: Comprehensive iOS/mobile device detection
 - **Audio Context Info**: Shows Tone.js and raw WebAudio context states
 - **Capability Tests**: Tests if audio nodes can be created
@@ -26,6 +29,7 @@
 ## Current Status
 
 ✅ **Working Features**:
+
 - Development server running successfully (http://localhost:5173/)
 - No runtime errors detected
 - Enhanced mobile detection
@@ -33,6 +37,7 @@
 - Debug functionality
 
 ⚠️ **Known Issues to Fix**:
+
 - String literal issue in `unlockAudio` function (unterminated data URL)
 - Some TypeScript warnings for MidiWriter usage
 - Template parsing issues resolved
@@ -40,11 +45,13 @@
 ## Next Steps for Testing
 
 ### On Desktop:
+
 1. ✅ Server is running and accessible
-2. ✅ UI loads without errors  
+2. ✅ UI loads without errors
 3. ✅ Force unlock and debug buttons visible on mobile-detected devices
 
 ### On iOS Device:
+
 1. Open http://localhost:5173/ (or deployed URL) in Safari/Chrome
 2. Try standard audio unlock first
 3. Use "Force iOS Unlock" button if needed
