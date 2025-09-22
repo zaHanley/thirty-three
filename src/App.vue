@@ -97,7 +97,12 @@
             <!-- Audio mode toggle -->
             <div class="form-control">
               <label class="label cursor-pointer gap-2">
-                <span class="label-text text-xs">Samples</span>
+                <span 
+                  class="label-text text-xs"
+                  :class="{ 'text-primary': useSamples }"
+                >
+                  Samples
+                </span>
                 <input
                   type="checkbox"
                   v-model="useSamples"
@@ -249,11 +254,15 @@ const isPlaying = ref(false)
 const isControlsExpanded = ref(true)
 const currentPlayingIndex = ref(-1)
 const useSamples = ref(true) // Toggle between samples and MIDI tones
-// Sample players for your MP3 files
-let topSamplePlayer: Tone.Player | null = null     // For first note of cycle
-let chugSamplePlayer: Tone.Player | null = null    // For other notes
-let stackSamplePlayer: Tone.Player | null = null   // For metronome clicks
-let snareSamplePlayer: Tone.Player | null = null   // For snare on beat 3
+// Sample players for your MP3 files - using multiple instances to avoid choppiness
+let topSamplePlayers: Tone.Player[] = []
+let chugSamplePlayers: Tone.Player[] = []
+let stackSamplePlayer: Tone.Player | null = null
+let snareSamplePlayer: Tone.Player | null = null
+
+// Current player index for round-robin
+let topPlayerIndex = 0
+let chugPlayerIndex = 0
 
 // MIDI synths for tone generation
 let synth: Tone.PolySynth | null = null
@@ -530,9 +539,17 @@ async function playPreview() {
 
     if (useSamples.value) {
       console.log('Using samples mode')
-      // Create sample players for your MP3 files
-      topSamplePlayer = new Tone.Player(SAMPLE_PATHS.top).toDestination()
-      chugSamplePlayer = new Tone.Player(SAMPLE_PATHS.chug).toDestination()
+      // Create multiple sample players for smoother playback (round-robin)
+      const numPlayers = 4 // Create 4 instances of each sample
+      
+      topSamplePlayers = []
+      chugSamplePlayers = []
+      
+      for (let i = 0; i < numPlayers; i++) {
+        topSamplePlayers.push(new Tone.Player(SAMPLE_PATHS.top).toDestination())
+        chugSamplePlayers.push(new Tone.Player(SAMPLE_PATHS.chug).toDestination())
+      }
+      
       stackSamplePlayer = new Tone.Player(SAMPLE_PATHS.stack).toDestination()
       snareSamplePlayer = new Tone.Player(SAMPLE_PATHS.snare).toDestination()
 
@@ -629,14 +646,21 @@ async function playPreview() {
       currentPlayingIndex.value = eventIndex % groupingLength
 
       if (useSamples.value) {
-        // Play the appropriate sample - top.mp3 for first note of cycle, chug.mp3 for others
+        // Play the appropriate sample using round-robin to avoid choppiness
         const isFirstNoteOfCycle = (eventIndex % groupingLength) === 0
-        const samplePlayer = isFirstNoteOfCycle ? topSamplePlayer : chugSamplePlayer
         
-        if (samplePlayer && samplePlayer.loaded) {
-          // Stop any previous playback and start fresh with exact duration
-          samplePlayer.stop()
-          samplePlayer.start('+0', 0, durSeconds)
+        if (isFirstNoteOfCycle) {
+          const player = topSamplePlayers[topPlayerIndex]
+          if (player && player.loaded) {
+            player.start('+0', 0, durSeconds)
+          }
+          topPlayerIndex = (topPlayerIndex + 1) % topSamplePlayers.length
+        } else {
+          const player = chugSamplePlayers[chugPlayerIndex]
+          if (player && player.loaded) {
+            player.start('+0', 0, durSeconds)
+          }
+          chugPlayerIndex = (chugPlayerIndex + 1) % chugSamplePlayers.length
         }
       } else {
         // Play MIDI tone
@@ -682,16 +706,23 @@ function stopPreview() {
   }
 
   // Stop and dispose sample players
-  if (topSamplePlayer) {
-    topSamplePlayer.stop()
-    topSamplePlayer.dispose()
-    topSamplePlayer = null
-  }
-  if (chugSamplePlayer) {
-    chugSamplePlayer.stop()
-    chugSamplePlayer.dispose()
-    chugSamplePlayer = null
-  }
+  topSamplePlayers.forEach(player => {
+    if (player) {
+      player.stop()
+      player.dispose()
+    }
+  })
+  topSamplePlayers = []
+  topPlayerIndex = 0
+  
+  chugSamplePlayers.forEach(player => {
+    if (player) {
+      player.stop()
+      player.dispose()
+    }
+  })
+  chugSamplePlayers = []
+  chugPlayerIndex = 0
   if (stackSamplePlayer) {
     stackSamplePlayer.stop()
     stackSamplePlayer.dispose()
