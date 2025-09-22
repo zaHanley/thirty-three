@@ -1,6 +1,6 @@
 <template>
   <div class="p-6 space-y-4 max-w-3xl mx-auto mt-10">
-    <h1 class="text-4xl font-bold">33</h1>
+    <h1 class="text-4xl font-bold">THIRTYTHR33</h1>
     <div class="flex flex-row gap-1 w-full">
       <div class="flex flex-col gap-1">
         <label class="input rounded">
@@ -37,8 +37,27 @@
         @click="generateGroupings"
         class="btn btn-sm btn-primary text-primary-content rounded"
       >
-        Generate Groupings
+        Generate
       </button>
+    </div>
+
+    <!-- Partition selection controls -->
+    <div class="mb-4 p-3 bg-base-200 rounded">
+      <h3 class="text-sm font-medium mb-2">Enabled Durations:</h3>
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="partitionValue in [1, 2, 3, 4, 5, 6, 7, 9]"
+          :key="partitionValue"
+          @click="togglePartition(partitionValue)"
+          class="btn btn-xs rounded"
+          :class="{
+            'btn-primary': enabledPartitions.has(partitionValue),
+            'btn-outline': !enabledPartitions.has(partitionValue),
+          }"
+        >
+          {{ partitionValue }}
+        </button>
+      </div>
     </div>
 
     <div v-if="groupings.length">
@@ -49,7 +68,7 @@
         <h3 class="text-sm font-medium mb-2">Show/Hide Groups:</h3>
         <div class="flex flex-wrap gap-2">
           <button
-            v-for="firstValue in [2, 3, 5, 7, 9]"
+            v-for="firstValue in [1, 2, 3, 4, 5, 6, 7, 9]"
             :key="firstValue"
             @click="toggleGroupVisibility(firstValue)"
             class="btn btn-xs rounded"
@@ -63,25 +82,33 @@
         </div>
       </div>
 
-      <details class="collapse bg-base-100 border-base-300 border">
-        <summary class="collapse-title font-semibold">How do I create an account?</summary>
-        <div class="collapse-content text-sm">
-          Click the "Sign Up" button in the top right corner and follow the registration process.
-        </div>
-      </details>
-      <div class="flex flex-wrap gap-2 rounded bord">
-        <button
-          v-for="(g, i) in filteredGroupings"
-          :key="i"
-          @click="selectGrouping(g)"
-          class="btn btn-xs px-3 py-1 rounded border"
-          :class="{
-            'btn-success text-success-content': selectedGrouping === g && !isPlaying,
-            'btn-error': selectedGrouping === g && isPlaying,
-          }"
+      <div class="space-y-2">
+        <details
+          v-for="firstValue in [1, 2, 3, 4, 5, 6, 7, 9].filter((v) => groupCounts[v] > 0)"
+          :key="firstValue"
+          class="collapse bg-base-100 border-base-300 border"
+          :class="{ hidden: !visibleGroups.has(firstValue) }"
         >
-          {{ g.join('-') }}
-        </button>
+          <summary class="collapse-title font-semibold">
+            Starting with {{ firstValue }} ({{ groupCounts[firstValue] }} groupings)
+          </summary>
+          <div class="collapse-content">
+            <div class="flex flex-wrap gap-2 p-2">
+              <button
+                v-for="(g, i) in groupedGroupings[firstValue] || []"
+                :key="`${firstValue}-${i}`"
+                @click="selectGrouping(g)"
+                class="btn btn-xs px-3 py-1 rounded border"
+                :class="{
+                  'btn-success text-success-content': selectedGrouping === g && !isPlaying,
+                  'btn-error': selectedGrouping === g && isPlaying,
+                }"
+              >
+                {{ g.join('-') }}
+              </button>
+            </div>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -127,15 +154,16 @@ const phraseBars = ref(8)
 const pitch = ref(42)
 const maxRepeat = ref(1)
 
-const groupings = ref([] as number[][])
-const groupedGroupings = ref({} as Record<number, number[][]>)
-const visibleGroups = ref(new Set([2, 3, 5, 7, 9]) as Set<number>)
-const filteredGroupings = ref([] as number[][])
-const selectedGrouping = ref(null as number[] | null)
+const enabledPartitions = ref(new Set([2, 3, 5, 7, 9]))
+const groupings = ref<number[][]>([])
+const groupedGroupings = ref<Record<number, number[][]>>({})
+const visibleGroups = ref(new Set([1, 2, 3, 4, 5, 6, 7, 9]))
+const filteredGroupings = ref<number[][]>([])
+const selectedGrouping = ref<number[] | null>(null)
 const truncation = ref(0)
 const fullCycles = ref(0)
-const midiUrl = ref(null as string | null)
-const midiEvents = ref([] as { pitch: number; duration: number }[])
+const midiUrl = ref<string | null>(null)
+const midiEvents = ref<{ pitch: number; duration: number }[]>([])
 const isPlaying = ref(false)
 let synth: Tone.PolySynth | null = null
 let clickSynth: Tone.MetalSynth | null = null
@@ -143,7 +171,7 @@ let clickLoop: Tone.Loop | null = null
 
 const groupCounts = computed(() => {
   const counts: Record<number, number> = {}
-  for (const firstValue of [2, 3, 5, 7, 9]) {
+  for (const firstValue of [1, 2, 3, 4, 5, 6, 7, 9]) {
     counts[firstValue] = groupedGroupings.value[firstValue]?.length || 0
   }
   return counts
@@ -185,6 +213,14 @@ function toggleGroupVisibility(firstValue: number) {
   }
   updateFilteredGroupings()
 }
+
+function togglePartition(partitionValue: number) {
+  if (enabledPartitions.value.has(partitionValue)) {
+    enabledPartitions.value.delete(partitionValue)
+  } else {
+    enabledPartitions.value.add(partitionValue)
+  }
+}
 function generateGroupings() {
   const [num, denom] = guestCycle.value.split('/').map(Number)
   if (denom !== 16) {
@@ -192,13 +228,31 @@ function generateGroupings() {
     return
   }
   const rawGroupings: number[][] = []
-  generatePartitions(num, [2, 3, 5, 7, 9], [], rawGroupings)
+  const allowedPartitions = Array.from(enabledPartitions.value).sort((a, b) => a - b)
+  generatePartitions(num, allowedPartitions, [], rawGroupings)
 
   groupings.value = rawGroupings.filter((g) => {
     const unique = new Set(g)
     if (unique.size <= 1) return false
     if (!(unique.has(5) || unique.has(7))) return false
     if (hasTooManyConsecutive(g, 2, maxRepeat.value)) return false
+
+    // Check that 1s only appear directly before or after numbers >= 3
+    for (let i = 0; i < g.length; i++) {
+      if (g[i] === 1) {
+        const prevValid = i > 0 && g[i - 1] >= 3
+        const nextValid = i < g.length - 1 && g[i + 1] >= 3
+        if (!prevValid && !nextValid) return false
+      }
+    }
+
+    // Check that there are never two 1s directly adjacent to each other
+    for (let i = 0; i < g.length - 1; i++) {
+      if (g[i] === 1 && g[i + 1] === 1) {
+        return false
+      }
+    }
+
     return true
   })
 
@@ -242,13 +296,13 @@ function computeTruncation() {
 }
 
 async function selectGrouping(g: number[]) {
+  if (isPlaying.value && selectedGrouping.value === g) {
+    stopPreview()
+    return
+  }
   selectedGrouping.value = g
   generateMIDI()
-  if (isPlaying.value) {
-    stopPreview()
-  } else {
-    await playPreview()
-  }
+  await playPreview()
 }
 
 function generateMIDI() {
