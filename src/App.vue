@@ -27,7 +27,7 @@
                   </label>
                   <label class="input input-sm rounded">
                     <span class="text-secondary text-xs">Guest</span>
-                    <input v-model="guestCycle" type="text" placeholder="19/16" class="text-sm" />
+                    <input v-model="guestCycle" type="text" placeholder="25/16" class="text-sm" />
                   </label>
                 </div>
                 <div class="flex flex-col gap-1">
@@ -216,13 +216,13 @@ import * as Tone from 'tone'
 
 const tempo = ref(130)
 const hostTimeSig = ref('4/4')
-const guestCycle = ref('19/16')
+const guestCycle = ref('25/16')
 const phraseBars = ref(8)
 const pitch = ref(42)
 const maxRepeat = ref(1)
 
 const isGenerating = ref(false)
-const enabledPartitions = ref(new Set([2, 3, 5, 7, 9]))
+const enabledPartitions = ref(new Set([1, 2, 5, 7, 9]))
 const groupings = ref<number[][]>([])
 const groupedGroupings = ref<Record<number, number[][]>>({})
 const visibleGroups = ref(new Set([1, 2, 3, 4, 5, 6, 7, 9]))
