@@ -205,7 +205,7 @@
               <!-- Audio mode toggle -->
               <div class="form-control">
                 <label class="label cursor-pointer gap-2">
-                  <span class="label-text text-xs" :class="{ 'text-primary': useSamples }">
+                  <span class="label-text text-xs ml-3" :class="{ 'text-primary': useSamples }">
                     Samples
                   </span>
                   <input
@@ -217,50 +217,53 @@
               </div>
             </div>
 
-            <!-- Main action buttons - mobile responsive -->
-            <div class="flex flex-col sm:flex-row gap-2 w-full">
-              <button
-                @click="generateGroupings"
-                :disabled="isGenerating"
-                class="btn btn-sm btn-primary text-primary-content rounded flex-1 sm:flex-none"
-              >
-                <span v-if="isGenerating" class="animate-pulse text-center block"
-                  >Generating ...</span
+            <!-- Main action buttons - mobile responsive with 2x2 grid -->
+            <div class="p-3 bg-base-200 rounded">
+              <!-- Mobile: 2x2 grid, Desktop: horizontal flow -->
+              <div class="grid grid-cols-2 sm:flex sm:flex-row gap-2 w-full">
+                <button
+                  @click="generateGroupings"
+                  :disabled="isGenerating"
+                  class="btn btn-sm btn-primary text-primary-content rounded min-h-[2rem] sm:flex-none"
                 >
-                <span v-else>Generate</span>
-              </button>
+                  <span v-if="isGenerating" class="animate-pulse text-center block"
+                    >Generating ...</span
+                  >
+                  <span v-else>Generate</span>
+                </button>
 
-              <button
-                v-if="groupings.length > 0"
-                @click="selectRandomGrouping"
-                class="btn btn-sm btn-secondary rounded flex-1 sm:flex-none"
-              >
-                Random
-              </button>
+                <button
+                  v-if="groupings.length > 0"
+                  @click="selectRandomGrouping"
+                  class="btn btn-sm btn-secondary rounded min-h-[2rem] sm:flex-none"
+                >
+                  Random
+                </button>
 
-              <!-- Action buttons that appear when grouping is selected -->
-              <div v-if="selectedGrouping" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <button
-                  v-if="midiUrl"
-                  @click="downloadMIDI"
-                  class="btn btn-sm bg-purple-600 text-white rounded flex-1 sm:flex-none whitespace-nowrap"
-                >
-                  Download MIDI
-                </button>
-                <button
-                  v-if="midiEvents.length && !isPlaying"
-                  @click="playPreview()"
-                  class="btn btn-sm bg-green-600 text-white rounded flex-1 sm:flex-none"
-                >
-                  Play
-                </button>
-                <button
-                  v-if="isPlaying"
-                  @click="stopPreview"
-                  class="btn btn-sm bg-red-600 text-white rounded flex-1 sm:flex-none"
-                >
-                  Stop
-                </button>
+                <!-- Action buttons that appear when grouping is selected -->
+                <template v-if="selectedGrouping">
+                  <button
+                    v-if="midiUrl"
+                    @click="downloadMIDI"
+                    class="btn btn-sm bg-purple-600 text-white rounded min-h-[2rem] sm:flex-none whitespace-nowrap text-xs sm:text-sm"
+                  >
+                    Download MIDI
+                  </button>
+                  <button
+                    v-if="midiEvents.length && !isPlaying"
+                    @click="playPreview()"
+                    class="btn btn-sm bg-green-600 text-white rounded min-h-[2rem] sm:flex-none"
+                  >
+                    Play
+                  </button>
+                  <button
+                    v-if="isPlaying"
+                    @click="stopPreview"
+                    class="btn btn-sm bg-red-600 text-white rounded min-h-[2rem] sm:flex-none"
+                  >
+                    Stop
+                  </button>
+                </template>
               </div>
             </div>
           </div>
