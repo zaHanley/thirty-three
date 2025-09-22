@@ -923,14 +923,14 @@ async function playPreview() {
             const scheduleTime = '+0.01' // 10ms offset
             player.start(scheduleTime, 0, durSeconds)
           }
-          
+
           // Play top bass sample simultaneously
           const bassPlayer = topBassSamplePlayers[topBassPlayerIndex]
           if (bassPlayer && bassPlayer.loaded) {
             const scheduleTime = '+0.01' // 10ms offset
             bassPlayer.start(scheduleTime, 0, durSeconds)
           }
-          
+
           topPlayerIndex = (topPlayerIndex + 1) % topSamplePlayers.length
           topBassPlayerIndex = (topBassPlayerIndex + 1) % topBassSamplePlayers.length
         } else {
@@ -941,14 +941,14 @@ async function playPreview() {
             const scheduleTime = '+0.01' // 10ms offset
             player.start(scheduleTime, 0, durSeconds)
           }
-          
+
           // Play chug bass sample simultaneously
           const bassPlayer = chugBassSamplePlayers[chugBassPlayerIndex]
           if (bassPlayer && bassPlayer.loaded) {
             const scheduleTime = '+0.01' // 10ms offset
             bassPlayer.start(scheduleTime, 0, durSeconds)
           }
-          
+
           chugPlayerIndex = (chugPlayerIndex + 1) % chugSamplePlayers.length
           chugBassPlayerIndex = (chugBassPlayerIndex + 1) % chugBassSamplePlayers.length
         }
