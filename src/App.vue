@@ -237,6 +237,7 @@ const isControlsExpanded = ref(true)
 const currentPlayingIndex = ref(-1)
 let synth: Tone.PolySynth | null = null
 let clickSynth: Tone.MetalSynth | null = null
+let snareSynth: Tone.NoiseSynth | null = null
 let clickLoop: Tone.Loop | null = null
 
 const groupCounts = computed(() => {
@@ -307,12 +308,12 @@ function togglePartition(partitionValue: number) {
 
 function selectRandomGrouping() {
   if (groupings.value.length === 0) return
-  
+
   // Stop any current playback first
   if (isPlaying.value) {
     stopPreview()
   }
-  
+
   const randomIndex = Math.floor(Math.random() * groupings.value.length)
   const randomGrouping = groupings.value[randomIndex]
   selectGrouping(randomGrouping)
@@ -492,6 +493,10 @@ async function playPreview() {
 
   synth = new Tone.PolySynth().toDestination()
   clickSynth = new Tone.MetalSynth().toDestination()
+  snareSynth = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 },
+  }).toDestination()
 
   // Start both the metronome and main playback at exactly the same time
   const startTime = performance.now()
@@ -513,8 +518,28 @@ async function playPreview() {
     }, delay)
   }
 
+  // Snare on beat 3 of each measure (assuming 4/4 time)
+  function scheduleNextSnare(nextSnareTime: number) {
+    if (!isPlaying.value) return
+
+    const now = performance.now()
+    const delay = Math.max(0, nextSnareTime - now)
+
+    setTimeout(() => {
+      if (!isPlaying.value) return
+      if (snareSynth) {
+        snareSynth.triggerAttackRelease('32n', '+0', 0.3)
+      }
+      // Next snare is 4 beats later (one measure)
+      scheduleNextSnare(nextSnareTime + beatDuration * 4)
+    }, delay)
+  }
+
   // Start the first click
   scheduleNextClick(startTime)
+
+  // Start the first snare on beat 3 (2 beats after start)
+  scheduleNextSnare(startTime + beatDuration * 2)
 
   const groupingLength = selectedGrouping.value.length
   let eventIndex = 0
@@ -563,6 +588,10 @@ function stopPreview() {
   if (clickSynth) {
     clickSynth.dispose()
     clickSynth = null
+  }
+  if (snareSynth) {
+    snareSynth.dispose()
+    snareSynth = null
   }
 }
 </script>
